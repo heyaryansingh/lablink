@@ -46,6 +46,13 @@ Beta publish command:
 npm run publish:beta
 ```
 
+Install from npm:
+
+```bash
+npm install -g lablink-cli@beta
+lablink demo
+```
+
 ## Architecture
 
 - Node.js 20, TypeScript, ESM

@@ -1,12 +1,12 @@
 {
-  "name": "@lablink/cli",
-  "version": "0.1.0-beta.0",
+  "name": "lablink-cli",
+  "version": "0.1.0-beta.1",
   "description": "Local-first terminal operating system for research labs",
   "type": "module",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/heyaryansingh/lablink.git"
+    "url": "git+https://github.com/heyaryansingh/lablink.git"
   },
   "bugs": {
     "url": "https://github.com/heyaryansingh/lablink/issues"
