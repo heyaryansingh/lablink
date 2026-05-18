@@ -49,13 +49,8 @@ export function createDefaultConfig(): LabLinkConfig {
         local: {
           provider: 'local',
           model: process.env.LABLINK_LOCAL_MODEL || 'local-model',
-          baseUrl: process.env.LABLINK_LOCAL_AI_URL || 'http://localhost:11434/v1',
+          baseUrl: process.env.LABLINK_LOCAL_AI_URL,
           timeoutMs: 60_000,
-        },
-        mock: {
-          provider: 'mock',
-          model: 'mock',
-          timeoutMs: 1_000,
         },
       },
       autoTaskCreation: true,

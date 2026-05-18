@@ -5,7 +5,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 
-const VERSION = '0.1.0-beta.2';
+const VERSION = '0.1.0-beta.3';
 const APP_NAME = 'Lab Link';
 const SCHEMA_VERSION = 1;
 const DEFAULT_NOW = process.env.LABLINK_NOW || new Date().toISOString();
@@ -56,8 +56,10 @@ function bold(value, enabled) {
   return color(value, ansi.bold, enabled);
 }
 
-function dataDir({ demo = false, explicit } = {}) {
-  if (explicit) return path.resolve(explicit);
+function dataDir(options = {}) {
+  const { demo = false, explicit, dataDir: requestedDataDir } = options;
+  const requested = explicit || requestedDataDir;
+  if (requested) return path.resolve(requested);
   if (demo || process.env.LABLINK_DATA_DIR) return path.resolve(process.env.LABLINK_DATA_DIR || '.lablink-dev');
   return path.join(os.homedir(), '.lablink');
 }
@@ -89,14 +91,55 @@ function loadStore(options = {}) {
     return { dir, file, store: seeded };
   }
   const store = readJson(file, null);
-  if (store) return { dir, file, store };
+  if (store) {
+    const normalized = normalizeStore(store);
+    writeJson(file, normalized);
+    return { dir, file, store: normalized };
+  }
   const seeded = createSeedStore(DEFAULT_NOW);
   writeJson(file, seeded);
   return { dir, file, store: seeded };
 }
 
 function saveStore(context) {
+  normalizeStore(context.store);
   writeJson(context.file, context.store);
+}
+
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function normalizeStore(store) {
+  const defaults = createSeedStore(DEFAULT_NOW);
+  store.schemaVersion ||= defaults.schemaVersion;
+  store.lab ||= defaults.lab;
+  store.user ||= defaults.user;
+  store.featureFlags = { ...defaults.featureFlags, ...(store.featureFlags || {}) };
+  store.ui = { ...defaults.ui, ...(store.ui || {}) };
+  store.aiConfig = {
+    ...defaults.aiConfig,
+    ...(store.aiConfig || {}),
+    openai: { ...defaults.aiConfig.openai, ...(store.aiConfig?.openai || {}) },
+    anthropic: { ...defaults.aiConfig.anthropic, ...(store.aiConfig?.anthropic || {}) },
+    local: { ...defaults.aiConfig.local, ...(store.aiConfig?.local || {}) },
+    custom: { ...defaults.aiConfig.custom, ...(store.aiConfig?.custom || {}) },
+    policy: { ...defaults.aiConfig.policy, ...(store.aiConfig?.policy || {}) },
+  };
+  store.automation = { ...defaults.automation, ...(store.automation || {}) };
+  store.schedule = {
+    ...defaults.schedule,
+    ...(store.schedule || {}),
+    workHours: { ...defaults.schedule.workHours, ...(store.schedule?.workHours || {}) },
+  };
+  store.providers = cloneJson(defaults.providers);
+  store.calendarEvents ||= cloneJson(defaults.calendarEvents);
+  store.insights ||= [];
+  store.schedulePlans ||= [];
+  store.progressEvents ||= [];
+  store.aiRuns ||= [];
+  store.auditLog ||= [];
+  return store;
 }
 
 function createSeedStore(nowIso) {
@@ -146,11 +189,47 @@ function createSeedStore(nowIso) {
       keymap: 'default',
       layout: 'responsive',
     },
+    aiConfig: {
+      provider: process.env.LABLINK_AI_PROVIDER || 'auto',
+      openai: {
+        model: process.env.OPENAI_MODEL || 'gpt-5.5',
+        baseUrl: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1/responses',
+      },
+      anthropic: {
+        model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514',
+        baseUrl: process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com/v1/messages',
+      },
+      local: {
+        model: process.env.LABLINK_LOCAL_MODEL || 'local-model',
+        baseUrl: process.env.LABLINK_LOCAL_AI_URL || '',
+      },
+      custom: {
+        model: process.env.LABLINK_CUSTOM_AI_MODEL || 'custom-model',
+        baseUrl: process.env.LABLINK_CUSTOM_AI_URL || '',
+        apiKeyEnv: process.env.LABLINK_CUSTOM_AI_KEY_ENV || 'LABLINK_CUSTOM_AI_KEY',
+      },
+      policy: {
+        autoApply: false,
+        requireRealProvider: true,
+        sendTranscriptBodies: false,
+        sendEmailBodies: false,
+      },
+    },
+    automation: {
+      taskProgress: true,
+      minConfidence: 0.82,
+      fallbackToSuggestions: true,
+    },
+    schedule: {
+      workHours: { start: '09:00', end: '17:00' },
+      focusBlockMinutes: 90,
+      includeMeetings: true,
+    },
     providers: [
-      { id: 'mock', label: 'Deterministic Local AI', status: 'active', model: 'lablink-local-rules', lastError: null },
-      { id: 'anthropic', label: 'Anthropic', status: process.env.ANTHROPIC_API_KEY ? 'configured' : 'not configured', model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514', lastError: null },
       { id: 'openai', label: 'OpenAI Responses', status: process.env.OPENAI_API_KEY ? 'configured' : 'not configured', model: process.env.OPENAI_MODEL || 'gpt-5.5', lastError: null },
-      { id: 'local', label: 'OpenAI-compatible Local', status: process.env.LABLINK_LOCAL_AI_URL ? 'configured' : 'available', model: process.env.LABLINK_LOCAL_MODEL || 'local-model', lastError: null },
+      { id: 'anthropic', label: 'Anthropic Messages', status: process.env.ANTHROPIC_API_KEY ? 'configured' : 'not configured', model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514', lastError: null },
+      { id: 'local', label: 'OpenAI-compatible Local', status: process.env.LABLINK_LOCAL_AI_URL ? 'configured' : 'not configured', model: process.env.LABLINK_LOCAL_MODEL || 'local-model', lastError: null },
+      { id: 'custom', label: 'Custom AI Endpoint', status: process.env.LABLINK_CUSTOM_AI_URL ? 'configured' : 'not configured', model: process.env.LABLINK_CUSTOM_AI_MODEL || 'custom-model', lastError: null },
     ],
     integrations: [
       { id: 'microsoft', label: 'Microsoft Graph', status: process.env.MICROSOFT_CLIENT_ID ? 'configured' : 'not configured', nextStep: 'Set MICROSOFT_CLIENT_ID and run lablink sync.' },
@@ -186,6 +265,10 @@ function createSeedStore(nowIso) {
       { id: 'meeting-weekly', title: 'Weekly Lab Meeting', type: 'lab_meeting', at: at(-4, 13), status: 'processed', summary: 'Discussed AT8 supply risk, cohort 2 procedure timing, and behavioral analysis due this week.', artifacts: ['artifact-weekly'] },
       { id: 'meeting-project', title: 'Tau Project Sync', type: 'project_sync', at: at(1, 11), status: 'scheduled', summary: 'Upcoming sync for staining schedule and R01 figures.', artifacts: [] },
     ],
+    calendarEvents: [
+      { id: 'cal-lab-meeting', title: 'Weekly Lab Meeting', at: at(1, 13), durationMinutes: 60, source: 'demo calendar', projectId: null, prep: 'Review blocked tasks and pending AI suggestions.' },
+      { id: 'cal-core-booking', title: 'Imaging core booking', at: at(2, 10), durationMinutes: 120, source: 'demo calendar', projectId: 'project-imaging', prep: 'Bring segmentation validation notes.' },
+    ],
     meetingArtifacts: [
       { id: 'artifact-weekly', meetingId: 'meeting-weekly', source: 'demo transcript', kind: 'transcript', status: 'processed', importedAt: at(-4, 14), excerpt: 'Jordan will check alternate AT8 suppliers. Alex will have the open field analysis done by Friday.' },
     ],
@@ -201,6 +284,10 @@ function createSeedStore(nowIso) {
       { id: 'risk-at8', severity: 'high', projectId: 'project-tau', title: 'AT8 antibody backorder', mitigation: 'Check alternate vendors and validate substitute clone.' },
       { id: 'risk-qc', severity: 'medium', projectId: 'project-crispr', title: 'CRISPR library QC delayed', mitigation: 'Reserve analysis time and escalate if QC misses Friday.' },
     ],
+    insights: [],
+    schedulePlans: [],
+    progressEvents: [],
+    aiRuns: [],
     auditLog: [
       { id: 'audit-seed', at: at(0, 7), actor: 'system', action: 'seed_demo', detail: 'Created bootstrap demo workspace.' },
     ],
@@ -422,10 +509,11 @@ function renderCommand(store, width, useColor, state = {}) {
 
 function systemStatus(store, width, useColor) {
   const pending = store.aiSuggestions.filter((item) => item.status === 'pending').length;
-  const ai = store.providers.find((provider) => provider.id === 'mock');
+  const ai = resolveAiProvider(store, {});
+  const aiLabel = ai.available ? `${ai.label} configured` : 'AI provider not configured';
   const zoom = store.integrations.find((integration) => integration.id === 'zoom');
   return color(
-    truncate(`Status: ${ai.label} ${ai.status} | Zoom ${zoom.status} | ${pending} AI suggestions need review`, width - 2),
+    truncate(`Status: ${aiLabel} | Zoom ${zoom.status} | ${pending} review suggestions need attention`, width - 2),
     ansi.dark,
     useColor,
   );
@@ -1012,6 +1100,511 @@ function listSuggestions(options) {
   }
 }
 
+function optionValue(args, flag) {
+  const index = args.indexOf(flag);
+  return index >= 0 ? args[index + 1] : null;
+}
+
+function normalizeConfigPath(configPath) {
+  if (configPath === 'ai') return 'aiConfig';
+  if (configPath.startsWith('ai.')) return `aiConfig.${configPath.slice(3)}`;
+  return configPath;
+}
+
+function parseConfigValue(value) {
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  if (value === 'null') return null;
+  if (/^-?\d+(\.\d+)?$/.test(value)) return Number(value);
+  if ((value.startsWith('{') && value.endsWith('}')) || (value.startsWith('[') && value.endsWith(']'))) {
+    return JSON.parse(value);
+  }
+  return value;
+}
+
+function getPathValue(target, configPath) {
+  return normalizeConfigPath(configPath).split('.').reduce((current, segment) => current?.[segment], target);
+}
+
+function setPathValue(target, configPath, value) {
+  const parts = normalizeConfigPath(configPath).split('.');
+  let current = target;
+  for (const part of parts.slice(0, -1)) {
+    if (!current[part] || typeof current[part] !== 'object') current[part] = {};
+    current = current[part];
+  }
+  current[parts.at(-1)] = value;
+}
+
+function publicConfig(store) {
+  return {
+    lab: store.lab,
+    user: store.user,
+    featureFlags: store.featureFlags,
+    ui: store.ui,
+    ai: store.aiConfig,
+    automation: store.automation,
+    schedule: store.schedule,
+  };
+}
+
+function handleConfigCommand(args, options) {
+  const context = loadStore(options);
+  const subcommand = args[1] || 'path';
+  if (subcommand === 'path') {
+    process.stdout.write(`${context.file}\n`);
+    return;
+  }
+  if (subcommand === 'show') {
+    process.stdout.write(`${JSON.stringify(publicConfig(context.store), null, 2)}\n`);
+    return;
+  }
+  if (subcommand === 'get') {
+    const configPath = args[2];
+    if (!configPath) throw new Error('Usage: lablink config get <path>');
+    process.stdout.write(`${JSON.stringify(getPathValue(context.store, configPath), null, 2)}\n`);
+    return;
+  }
+  if (subcommand === 'set') {
+    const configPath = args[2];
+    const rawValue = args.slice(3).join(' ');
+    if (!configPath || rawValue.length === 0) throw new Error('Usage: lablink config set <path> <value>');
+    setPathValue(context.store, configPath, parseConfigValue(rawValue));
+    context.store.auditLog.push({
+      id: `audit-${Date.now()}`,
+      at: new Date().toISOString(),
+      actor: context.store.user.id,
+      action: 'config_set',
+      detail: `${configPath} updated`,
+    });
+    saveStore(context);
+    process.stdout.write(`Updated ${configPath}.\n`);
+    return;
+  }
+  throw new Error('Usage: lablink config path|show|get <path>|set <path> <value>');
+}
+
+function providerKeyStatus(provider) {
+  if (provider === 'openai') return Boolean(process.env.OPENAI_API_KEY);
+  if (provider === 'anthropic') return Boolean(process.env.ANTHROPIC_API_KEY);
+  if (provider === 'local') return true;
+  if (provider === 'custom') return true;
+  return false;
+}
+
+function providerBaseUrl(store, provider) {
+  return store.aiConfig?.[provider]?.baseUrl || '';
+}
+
+function providerModel(store, provider) {
+  return store.aiConfig?.[provider]?.model || `${provider}-model`;
+}
+
+function providerLabel(provider) {
+  return {
+    openai: 'OpenAI Responses',
+    anthropic: 'Anthropic Messages',
+    local: 'Local OpenAI-compatible endpoint',
+    custom: 'Custom AI endpoint',
+  }[provider] || provider;
+}
+
+function resolveAiProvider(store, options = {}) {
+  const requested = options.provider || process.env.LABLINK_AI_PROVIDER || store.aiConfig?.provider || 'auto';
+  const candidates = requested === 'auto' ? ['openai', 'anthropic', 'local', 'custom'] : [requested];
+  for (const provider of candidates) {
+    if (provider === 'openai' && process.env.OPENAI_API_KEY) {
+      return { available: true, id: provider, label: providerLabel(provider), model: providerModel(store, provider), baseUrl: providerBaseUrl(store, provider) };
+    }
+    if (provider === 'anthropic' && process.env.ANTHROPIC_API_KEY) {
+      return { available: true, id: provider, label: providerLabel(provider), model: providerModel(store, provider), baseUrl: providerBaseUrl(store, provider) };
+    }
+    if ((provider === 'local' || provider === 'custom') && providerBaseUrl(store, provider)) {
+      return { available: true, id: provider, label: providerLabel(provider), model: providerModel(store, provider), baseUrl: providerBaseUrl(store, provider) };
+    }
+  }
+  return {
+    available: false,
+    id: requested,
+    label: 'No real AI provider configured',
+    model: null,
+    baseUrl: null,
+    reason: 'Set OPENAI_API_KEY, ANTHROPIC_API_KEY, LABLINK_LOCAL_AI_URL, or LABLINK_CUSTOM_AI_URL.',
+  };
+}
+
+function aiStatusText(store, options = {}) {
+  const resolved = resolveAiProvider(store, options);
+  const rows = [
+    `AI provider: ${resolved.available ? resolved.label : 'not configured'}`,
+    `Route: ${options.provider || store.aiConfig?.provider || 'auto'}`,
+    `OpenAI: ${process.env.OPENAI_API_KEY ? 'configured' : 'missing OPENAI_API_KEY'} (${providerModel(store, 'openai')})`,
+    `Anthropic: ${process.env.ANTHROPIC_API_KEY ? 'configured' : 'missing ANTHROPIC_API_KEY'} (${providerModel(store, 'anthropic')})`,
+    `Local endpoint: ${providerBaseUrl(store, 'local') || 'not configured'}`,
+    `Custom endpoint: ${providerBaseUrl(store, 'custom') || 'not configured'}`,
+    `Policy: real provider required; no fake AI fallback`,
+  ];
+  if (!resolved.available) rows.push(`Next step: ${resolved.reason}`);
+  return rows.join('\n');
+}
+
+function labStateSummary(store) {
+  return JSON.stringify({
+    lab: store.lab,
+    tasks: store.tasks.map((task) => ({
+      id: task.id,
+      title: task.title,
+      project: projectName(store, task.projectId),
+      assignee: task.assignee,
+      priority: task.priority,
+      status: task.status,
+      due: task.due,
+      score: task.score,
+      reason: task.reason,
+    })),
+    projects: store.projects.map((project) => ({
+      id: project.id,
+      name: project.name,
+      status: project.status,
+      owner: project.owner,
+      completion: project.completion,
+      nextDeadline: project.nextDeadline,
+      health: project.health,
+    })),
+    risks: store.risks,
+    meetings: store.meetings.map((meeting) => ({
+      title: meeting.title,
+      at: meeting.at,
+      status: meeting.status,
+      summary: meeting.summary,
+    })),
+    calendarEvents: store.calendarEvents || [],
+  }, null, 2);
+}
+
+function extractOpenAiText(payload) {
+  if (typeof payload.output_text === 'string') return payload.output_text;
+  const chunks = [];
+  for (const item of payload.output || []) {
+    for (const content of item.content || []) {
+      if (typeof content.text === 'string') chunks.push(content.text);
+    }
+  }
+  return chunks.join('\n').trim();
+}
+
+async function postJson(url, headers, body) {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...headers },
+    body: JSON.stringify(body),
+  });
+  const text = await response.text();
+  let payload = null;
+  try {
+    payload = text ? JSON.parse(text) : {};
+  } catch {
+    payload = { raw: text };
+  }
+  if (!response.ok) {
+    const detail = payload?.error?.message || payload?.message || text || response.statusText;
+    throw new Error(`${response.status} ${detail}`);
+  }
+  return payload;
+}
+
+async function callOpenAi(provider, prompt, instructions) {
+  const payload = await postJson(
+    provider.baseUrl,
+    { authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+    {
+      model: provider.model,
+      instructions,
+      input: prompt,
+      max_output_tokens: Number(process.env.OPENAI_MAX_OUTPUT_TOKENS || 900),
+    },
+  );
+  return extractOpenAiText(payload) || JSON.stringify(payload);
+}
+
+async function callAnthropic(provider, prompt, instructions) {
+  const payload = await postJson(
+    provider.baseUrl,
+    {
+      'x-api-key': process.env.ANTHROPIC_API_KEY,
+      'anthropic-version': process.env.ANTHROPIC_VERSION || '2023-06-01',
+    },
+    {
+      model: provider.model,
+      max_tokens: Number(process.env.ANTHROPIC_MAX_TOKENS || 900),
+      system: instructions,
+      messages: [{ role: 'user', content: prompt }],
+    },
+  );
+  return (payload.content || []).map((item) => item.text || '').join('\n').trim() || JSON.stringify(payload);
+}
+
+async function callCompatible(provider, prompt, instructions) {
+  const keyEnv = provider.id === 'custom' ? process.env.LABLINK_CUSTOM_AI_KEY_ENV || 'LABLINK_CUSTOM_AI_KEY' : 'LABLINK_LOCAL_AI_KEY';
+  const apiKey = process.env[keyEnv];
+  const url = /\/(chat\/completions|responses)$/.test(provider.baseUrl)
+    ? provider.baseUrl
+    : `${provider.baseUrl.replace(/\/$/, '')}/chat/completions`;
+  const headers = apiKey ? { authorization: `Bearer ${apiKey}` } : {};
+  if (url.endsWith('/responses')) {
+    const payload = await postJson(url, headers, { model: provider.model, instructions, input: prompt, max_output_tokens: 900 });
+    return extractOpenAiText(payload) || JSON.stringify(payload);
+  }
+  const payload = await postJson(url, headers, {
+    model: provider.model,
+    messages: [
+      { role: 'system', content: instructions },
+      { role: 'user', content: prompt },
+    ],
+    temperature: 0.2,
+  });
+  return payload.choices?.[0]?.message?.content || JSON.stringify(payload);
+}
+
+async function runAiText(context, feature, prompt, instructions, options = {}) {
+  const provider = resolveAiProvider(context.store, options);
+  const started = Date.now();
+  const run = {
+    id: `airun-${Date.now()}`,
+    at: new Date().toISOString(),
+    provider: provider.id,
+    model: provider.model,
+    feature,
+    promptSummary: truncate(prompt.replace(/\s+/g, ' '), 180),
+    status: 'started',
+    latencyMs: null,
+    error: null,
+  };
+  context.store.aiRuns ||= [];
+  context.store.aiRuns.push(run);
+  if (!provider.available) {
+    run.status = 'missing_provider';
+    run.error = provider.reason;
+    run.latencyMs = Date.now() - started;
+    saveStore(context);
+    throw new Error(`No real AI provider configured. ${provider.reason}`);
+  }
+  try {
+    let text = '';
+    if (provider.id === 'openai') text = await callOpenAi(provider, prompt, instructions);
+    else if (provider.id === 'anthropic') text = await callAnthropic(provider, prompt, instructions);
+    else text = await callCompatible(provider, prompt, instructions);
+    run.status = 'succeeded';
+    run.latencyMs = Date.now() - started;
+    run.outputPreview = truncate(text.replace(/\s+/g, ' '), 220);
+    saveStore(context);
+    return { provider, text, run };
+  } catch (error) {
+    run.status = 'failed';
+    run.error = error.message;
+    run.latencyMs = Date.now() - started;
+    saveStore(context);
+    throw error;
+  }
+}
+
+async function handleAiCommand(args, options) {
+  const context = loadStore({ ...options, demo: true });
+  const subcommand = args[1] || 'status';
+  const provider = optionValue(args, '--provider') || null;
+  if (subcommand === 'status') {
+    process.stdout.write(`${aiStatusText(context.store, { provider })}\n`);
+    return;
+  }
+  if (subcommand === 'list') return listSuggestions({ ...options, demo: true });
+  if (subcommand === 'approve') {
+    const result = approveSuggestion(args[2], { ...options, demo: true });
+    process.stdout.write(`Approved ${result.suggestion.id}; ${result.created ? `created ${result.created.id}` : 'already approved'}.\n`);
+    return;
+  }
+  if (subcommand === 'reject') {
+    const result = rejectSuggestion(args[2], { ...options, demo: true });
+    process.stdout.write(`Rejected ${result.suggestion.id}.\n`);
+    return;
+  }
+  if (subcommand === 'ask') {
+    const prompt = args.slice(2).filter((arg) => arg !== '--provider' && arg !== provider).join(' ').trim();
+    if (!prompt) throw new Error('Usage: lablink ai ask <prompt> [--provider openai|anthropic|local|custom]');
+    const result = await runAiText(context, 'ai.ask', prompt, 'You are Lab Link, a precise research lab operations assistant. Be concise, actionable, and explicit about uncertainty.', { provider });
+    process.stdout.write(`${result.text.trim()}\n`);
+    return;
+  }
+  if (subcommand === 'insights') {
+    const prompt = `Analyze this lab operating state and return concise, actionable insights. Include priorities, risks, scheduling pressure, coordination needs, and task progress opportunities.\n\n${labStateSummary(context.store)}`;
+    const result = await runAiText(context, 'ai.insights', prompt, 'You are Lab Link. Return practical lab operations insights. Do not invent facts outside the provided state.', { provider });
+    const insight = {
+      id: `insight-${Date.now()}`,
+      at: new Date().toISOString(),
+      provider: result.provider.id,
+      model: result.provider.model,
+      status: 'generated',
+      text: result.text.trim(),
+      aiRunId: result.run.id,
+    };
+    context.store.insights ||= [];
+    context.store.insights.push(insight);
+    context.store.auditLog.push({ id: `audit-${Date.now()}`, at: new Date().toISOString(), actor: context.store.user.id, action: 'ai_insights_generated', detail: `${result.provider.label} generated ${insight.id}` });
+    saveStore(context);
+    process.stdout.write(`${insight.text}\n`);
+    return;
+  }
+  throw new Error('Usage: lablink ai status|ask|insights|list|approve <id>|reject <id>');
+}
+
+function planSchedule(store) {
+  const openTasks = visibleTodayTasks(store).filter((task) => task.status !== 'done');
+  const blocks = [];
+  let hour = Number((store.schedule?.workHours?.start || '09:00').slice(0, 2));
+  for (const task of openTasks.slice(0, 5)) {
+    const minutes = task.priority === 'critical' ? 90 : task.priority === 'high' ? 75 : 45;
+    blocks.push({
+      at: `${String(hour).padStart(2, '0')}:00`,
+      minutes,
+      kind: 'focus',
+      title: task.title,
+      project: projectName(store, task.projectId),
+      reason: task.reason,
+    });
+    hour += Math.max(1, Math.ceil(minutes / 60));
+  }
+  for (const event of store.calendarEvents || []) {
+    blocks.push({
+      at: new Date(event.at).toTimeString().slice(0, 5),
+      minutes: event.durationMinutes,
+      kind: 'calendar',
+      title: event.title,
+      project: projectName(store, event.projectId),
+      reason: event.prep,
+    });
+  }
+  return blocks.sort((a, b) => a.at.localeCompare(b.at));
+}
+
+async function handleScheduleCommand(args, options) {
+  const context = loadStore({ ...options, demo: true });
+  const subcommand = args[1] || 'plan';
+  if (subcommand !== 'plan') throw new Error('Usage: lablink schedule plan');
+  if (args.includes('--ai')) {
+    const provider = optionValue(args, '--provider') || null;
+    const prompt = `Create a daily schedule plan from this lab state. Use work hours, meetings, risk, priority, dependencies, and deadlines. Return concise schedule blocks with reasons.\n\n${labStateSummary(context.store)}`;
+    const result = await runAiText(context, 'schedule.plan', prompt, 'You are Lab Link. Create a realistic research lab daily schedule from the provided state only.', { provider });
+    const plan = {
+      id: `schedule-${Date.now()}`,
+      at: new Date().toISOString(),
+      source: `${result.provider.label} schedule planner`,
+      text: result.text.trim(),
+      aiRunId: result.run.id,
+    };
+    context.store.schedulePlans ||= [];
+    context.store.schedulePlans.push(plan);
+    context.store.auditLog.push({ id: `audit-${Date.now()}`, at: new Date().toISOString(), actor: context.store.user.id, action: 'ai_schedule_plan_created', detail: `${result.provider.label} generated ${plan.id}` });
+    saveStore(context);
+    process.stdout.write(`${plan.text}\n`);
+    return;
+  }
+  const plan = {
+    id: `schedule-${Date.now()}`,
+    at: new Date().toISOString(),
+    source: 'rules-based scheduler',
+    blocks: planSchedule(context.store),
+  };
+  context.store.schedulePlans ||= [];
+  context.store.schedulePlans.push(plan);
+  context.store.auditLog.push({ id: `audit-${Date.now()}`, at: new Date().toISOString(), actor: context.store.user.id, action: 'schedule_plan_created', detail: `${plan.blocks.length} schedule blocks created.` });
+  saveStore(context);
+  process.stdout.write(`Schedule plan (${plan.source}; use --ai for real provider-backed scheduling)\n`);
+  for (const block of plan.blocks) {
+    process.stdout.write(`${pad(block.at, 6)} ${pad(`${block.minutes}m`, 6)} ${pad(block.kind, 10)} ${block.title} [${block.project}]\n`);
+    process.stdout.write(`        ${truncate(block.reason, 96)}\n`);
+  }
+}
+
+function inferProgress(task) {
+  if (task.status === 'done') return { confidence: 1, progress: 100, status: 'done', reason: 'Task is already marked done.' };
+  if (task.status === 'in_progress') return { confidence: 0.86, progress: Math.max(task.progress || 0, 45), status: 'in_progress', reason: 'Task is already in progress and has active execution evidence.' };
+  if (task.status === 'blocked') return { confidence: 0.88, progress: Math.max(task.progress || 0, 20), status: 'blocked', reason: 'Task has blocker evidence and should remain visible as blocked.' };
+  if (task.score >= 0.9) return { confidence: 0.74, progress: Math.max(task.progress || 0, 10), status: task.status, reason: 'High-priority task has no completion evidence; keep as pending.' };
+  return null;
+}
+
+async function handleAutomationCommand(args, options) {
+  const context = loadStore({ ...options, demo: true });
+  const subcommand = args[1] || 'run';
+  if (subcommand !== 'run') throw new Error('Usage: lablink automation run');
+  if (args.includes('--ai')) {
+    const provider = optionValue(args, '--provider') || null;
+    const prompt = `Review this lab state and propose task progress updates. Return only updates supported by evidence in the state. Include task id, proposed status/progress, confidence, and reason.\n\n${labStateSummary(context.store)}`;
+    const result = await runAiText(context, 'automation.taskProgress', prompt, 'You are Lab Link. Propose auditable task progress updates from the provided state only. Do not invent completion evidence.', { provider });
+    const suggestion = {
+      id: `sug-ai-progress-${Date.now()}`,
+      type: 'progress',
+      status: 'pending',
+      confidence: 0.7,
+      target: 'Task progress review',
+      title: 'Review provider-backed task progress proposals',
+      quote: truncate(result.text.trim(), 220),
+      reason: `Generated by ${result.provider.label}; review before applying.`,
+      source: result.run.id,
+    };
+    context.store.aiSuggestions.push(suggestion);
+    context.store.auditLog.push({ id: `audit-${Date.now()}`, at: new Date().toISOString(), actor: context.store.user.id, action: 'ai_progress_proposed', detail: `${result.provider.label} created ${suggestion.id}` });
+    saveStore(context);
+    process.stdout.write(`${result.text.trim()}\n`);
+    process.stdout.write(`\nCreated review suggestion ${suggestion.id}.\n`);
+    return;
+  }
+  if (!context.store.automation?.taskProgress) throw new Error('Task progress automation is disabled. Enable automation.taskProgress first.');
+  const events = [];
+  for (const task of context.store.tasks) {
+    const proposal = inferProgress(task);
+    if (!proposal) continue;
+    const previous = { progress: task.progress || 0, status: task.status };
+    if (proposal.confidence >= (context.store.automation.minConfidence || 0.82)) {
+      task.progress = proposal.progress;
+      task.status = proposal.status;
+      const event = {
+        id: `progress-${Date.now()}-${events.length}`,
+        at: new Date().toISOString(),
+        taskId: task.id,
+        action: 'task_progress_updated',
+        previous,
+        next: { progress: task.progress, status: task.status },
+        confidence: proposal.confidence,
+        reason: proposal.reason,
+        source: 'rules-based automation',
+      };
+      events.push(event);
+    } else if (context.store.automation.fallbackToSuggestions) {
+      context.store.aiSuggestions.push({
+        id: `sug-progress-${Date.now()}-${events.length}`,
+        type: 'progress',
+        status: 'pending',
+        confidence: proposal.confidence,
+        target: projectName(context.store, task.projectId),
+        title: `Review progress for ${task.title}`,
+        quote: proposal.reason,
+        reason: 'Progress evidence was not strong enough for automatic update.',
+        source: 'rules-based automation',
+      });
+    }
+  }
+  context.store.progressEvents ||= [];
+  context.store.progressEvents.push(...events);
+  context.store.auditLog.push({ id: `audit-${Date.now()}`, at: new Date().toISOString(), actor: context.store.user.id, action: 'automation_run', detail: `${events.length} task progress updates applied.` });
+  saveStore(context);
+  process.stdout.write(`Automation run complete (${events.length} rules-based progress updates applied; use --ai for real provider-backed proposals).\n`);
+  for (const event of events) {
+    const task = context.store.tasks.find((item) => item.id === event.taskId);
+    process.stdout.write(`${pad(event.next.status, 12)} ${pad(`${event.next.progress}%`, 6)} ${task?.title || event.taskId}\n`);
+    process.stdout.write(`             ${truncate(event.reason, 96)}\n`);
+  }
+}
+
 function runTests() {
   const context = loadStore({ demo: true });
   const snapshot = render(context.store, { view: 'command' }, { width: 118, height: 34, color: false });
@@ -1020,6 +1613,9 @@ function runTests() {
   assert(snapshot.includes('arrows move'), 'snapshot includes keyboard guidance');
   assert(cycleView('command', 1) === 'today', 'view cycling works');
   assert(selectionCount(context.store, 'today') > 0, 'today list is selectable');
+  assert(context.store.providers.every((provider) => ['openai', 'anthropic', 'local', 'custom'].includes(provider.id)), 'only real AI provider slots are registered');
+  assert(aiStatusText(context.store).includes('real provider required'), 'AI status states real-provider policy');
+  assert(planSchedule(context.store).length > 0, 'rules-based schedule plan creates blocks');
   const suggestions = createSuggestionsFromTranscript('Jordan will check AT8 suppliers.\nDecision: use cohort 2 for imaging.\nRisk: library QC is delayed.', 'test');
   assert(suggestions.length >= 3, 'transcript extraction creates suggestions');
   assert(suggestions.some((item) => item.type === 'task'), 'task suggestion exists');
@@ -1072,11 +1668,16 @@ Usage:
   lablink init
   lablink today [--snapshot]
   lablink meeting import <file>
+  lablink ai status
+  lablink ai ask <prompt>
+  lablink ai insights
   lablink ai list
   lablink ai approve <id>
   lablink ai reject <id>
+  lablink schedule plan [--ai]
+  lablink automation run [--ai]
   lablink sync
-  lablink config
+  lablink config path|show|get <path>|set <path> <value>
   lablink doctor
   lablink --version
 
@@ -1096,7 +1697,7 @@ function parseOptions(args) {
   return options;
 }
 
-function main() {
+async function main() {
   const args = process.argv.slice(2);
   const command = args[0] || 'demo';
   const options = parseOptions(args);
@@ -1114,11 +1715,7 @@ function main() {
     process.stdout.write(`${render(context.store, { view: 'command' }, { width: 118, height: 34, color: false })}\n`);
     return;
   }
-  if (command === 'config') {
-    const context = loadStore(options);
-    process.stdout.write(`${context.file}\n`);
-    return;
-  }
+  if (command === 'config') return handleConfigCommand(args, options);
   if (command === 'init' || command === 'seed') {
     const context = loadStore({ ...options, demo: options.demo || command === 'seed' });
     saveStore(context);
@@ -1130,17 +1727,9 @@ function main() {
     process.stdout.write(`Imported ${result.artifact.source}; created ${result.suggestions.length} AI review suggestions.\n`);
     return;
   }
-  if (command === 'ai' && args[1] === 'list') return listSuggestions({ ...options, demo: true });
-  if (command === 'ai' && args[1] === 'approve') {
-    const result = approveSuggestion(args[2], { ...options, demo: true });
-    process.stdout.write(`Approved ${result.suggestion.id}; ${result.created ? `created ${result.created.id}` : 'already approved'}.\n`);
-    return;
-  }
-  if (command === 'ai' && args[1] === 'reject') {
-    const result = rejectSuggestion(args[2], { ...options, demo: true });
-    process.stdout.write(`Rejected ${result.suggestion.id}.\n`);
-    return;
-  }
+  if (command === 'ai') return handleAiCommand(args, options);
+  if (command === 'schedule') return handleScheduleCommand(args, options);
+  if (command === 'automation') return handleAutomationCommand(args, options);
   if (command === 'sync') {
     const context = loadStore(options);
     for (const integration of context.store.integrations) {
@@ -1159,7 +1748,7 @@ function main() {
 }
 
 try {
-  main();
+  await main();
 } catch (error) {
   process.stderr.write(`Lab Link error: ${error.message}\n`);
   process.exit(1);

@@ -52,6 +52,25 @@ function output(command, args, options = {}) {
   }).trim();
 }
 
+function expectFailure(command, args, expected, options = {}) {
+  const spec = commandFor(command, args);
+  try {
+    execFileSync(spec.command, spec.args, {
+      cwd: options.cwd || root,
+      encoding: 'utf8',
+      env: childEnv(),
+      stdio: 'pipe',
+    });
+  } catch (error) {
+    const combined = `${error.stdout || ''}${error.stderr || ''}`;
+    if (!combined.includes(expected)) {
+      throw new Error(`Expected failure containing "${expected}", got: ${combined}`);
+    }
+    return;
+  }
+  throw new Error(`Expected command to fail: ${command} ${args.join(' ')}`);
+}
+
 try {
   fs.mkdirSync(cacheDir, { recursive: true });
   fs.mkdirSync(packDir, { recursive: true });
@@ -75,6 +94,17 @@ try {
   if (!smoke.includes('Command Center') || !smoke.includes('AI Review')) {
     throw new Error('Installed package smoke output did not include expected dashboard content.');
   }
+
+  const status = output(node, [cli, 'ai', 'status', '--data-dir', dataDir], { cwd: appDir });
+  if (!status.includes('real provider required')) throw new Error('AI status did not make real-provider policy explicit.');
+
+  expectFailure(node, [cli, 'ai', 'ask', 'test prompt', '--data-dir', dataDir], 'No real AI provider configured', { cwd: appDir });
+
+  const schedule = output(node, [cli, 'schedule', 'plan', '--data-dir', dataDir], { cwd: appDir });
+  if (!schedule.includes('rules-based')) throw new Error('Schedule plan did not identify non-AI rules-based behavior.');
+
+  const automation = output(node, [cli, 'automation', 'run', '--data-dir', dataDir], { cwd: appDir });
+  if (!automation.includes('Automation run complete')) throw new Error('Automation run did not complete from installed package.');
 
   process.stdout.write(`Release check passed with ${tarball}.\n`);
 } finally {

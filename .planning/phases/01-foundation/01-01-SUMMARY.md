@@ -29,7 +29,7 @@ status: verify-blocked
   - Ink TUI shell with sidebar, command center, today, project hub, meetings, search, and settings views
 - AI layer:
   - Provider-neutral client
-  - Anthropic, OpenAI Responses API, local OpenAI-compatible, and mock providers
+  - Anthropic, OpenAI Responses API, and real local/custom provider slots
   - Prompt registry, JSON parsing, task extraction, priority scoring
 - Integration layer:
   - Microsoft Graph device-code OAuth

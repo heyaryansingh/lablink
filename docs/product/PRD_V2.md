@@ -64,7 +64,7 @@ Lab Link turns fragmented lab work into a connected operating graph:
 - `lablink init` creates a real workspace with config, database, and optional demo data.
 - Command Center, Today, Project Hub, Meetings, Search, and Settings render from SQLite data.
 - Transcript ingestion creates reviewable summaries, tasks, decisions, risks, and follow-up drafts.
-- AI provider can be `mock`, `anthropic`, `openai`, `local`, or `custom`.
+- AI provider can be `anthropic`, `openai`, `local`, or `custom`; offline flows use labeled rules-based automation, not fake AI.
 - Microsoft, Google, and Zoom OAuth flows are implemented and testable with credentials.
 - Feature flags control lab-specific modules.
 - Tests cover data, config, AI parsing, meeting processing, and TUI snapshots.
@@ -220,7 +220,7 @@ Main sections:
 3. Lab type presets: wet lab, computational, clinical, core facility, custom.
 4. Feature flags.
 5. Data directory.
-6. AI provider setup: mock, Anthropic, OpenAI, local/custom.
+6. AI provider setup: Anthropic, OpenAI, local/custom.
 7. OAuth setup: Microsoft, Google, Zoom.
 8. Demo data optional.
 9. Database creation and migration.
@@ -380,7 +380,6 @@ interface MeetingBotProvider {
 
 Providers:
 
-- `mock`: deterministic offline development.
 - `anthropic`: Claude models.
 - `openai`: Responses API.
 - `local`: OpenAI-compatible local endpoint.
@@ -388,7 +387,7 @@ Providers:
 
 Selection:
 
-- `auto` chooses Anthropic if key exists, then OpenAI if key exists, then local if configured, then mock.
+- `auto` chooses Anthropic if key exists, then OpenAI if key exists, then local/custom if configured; otherwise AI commands show setup instructions.
 - Each automation can override provider/model.
 - Settings screen exposes provider status and last error.
 
@@ -548,7 +547,7 @@ Audit events:
 - Per-feature AI provider policy.
 - Per-feature data minimization.
 - Transcript/email body sending requires explicit enabled policy.
-- Local/mock provider supports offline operation.
+- Rules-based non-AI flows support offline operation.
 - AI run records store summaries, not necessarily full raw inputs.
 
 ### Meeting Consent
@@ -648,7 +647,7 @@ Settings UI:
 - Wide terminal `>120`.
 - Missing AI credentials.
 - Missing OAuth credentials.
-- Mock meeting transcript processing.
+- Rules-based meeting transcript processing.
 - Feature flag toggles.
 
 ## 17. Build And Distribution

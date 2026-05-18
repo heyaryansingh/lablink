@@ -23,7 +23,7 @@
 | Meetings view | Partial | Transcript import and review exist in bootstrap form; coordination pipeline is still shallow. |
 | AI Review | Partial | Suggestion approve/reject exists; editing, merging, and richer provenance need work. |
 | Keyboard navigation | Partial | Number keys work, but arrow-key navigation and stable selection state need refinement. |
-| AI provider layer | Partial | Anthropic/OpenAI/local/mock abstraction exists; routing and policy controls need depth. |
+| AI provider layer | Partial | Anthropic/OpenAI/local/custom abstraction exists; routing and policy controls need depth. |
 | OAuth adapters | Partial | Microsoft, Google, and Zoom adapters exist as scaffolding; live sync and refresh flows need hardening. |
 | Feature flags and extensions | Partial | Registry exists; runtime-driven customization still needs more surface area. |
 | Local bootstrap store | Built | Demo/local JSON store supports repeatable product demos. |

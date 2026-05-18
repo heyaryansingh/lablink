@@ -37,7 +37,7 @@ The AI layer exposes one provider-neutral interface:
 - `generateText` for natural language outputs.
 - `generateJson` for structured automation.
 - Provider config controls model, base URL, timeout, and reasoning effort.
-- Anthropic, OpenAI, local/custom, and mock providers share the same interface.
+- Anthropic, OpenAI, and real local/custom providers share the same interface; AI commands do not use fake provider responses.
 
 The OpenAI implementation uses the Responses API shape from official OpenAI developer docs, where current models are exposed through the Responses API.
 

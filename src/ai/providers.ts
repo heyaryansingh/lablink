@@ -111,43 +111,6 @@ export class LocalOpenAiCompatibleProvider implements AiProvider {
   }
 }
 
-export class MockProvider implements AiProvider {
-  readonly name = 'mock' as const;
-  readonly model = 'mock';
-
-  async generateText(request: AiRequest): Promise<AiTextResult> {
-    if (request.feature === 'task_extraction') {
-      return {
-        provider: this.name,
-        model: this.model,
-        text: JSON.stringify([
-          {
-            title: 'Review extracted meeting action item',
-            assigned_to_name: null,
-            due_date: null,
-            source_quote: request.prompt.slice(0, 140),
-            confidence: 0.74,
-          },
-        ]),
-      };
-    }
-
-    if (request.feature === 'priority_scoring') {
-      return {
-        provider: this.name,
-        model: this.model,
-        text: JSON.stringify({ score: 0.5, tier: 'medium', reason: 'Mock provider default score.' }),
-      };
-    }
-
-    return {
-      provider: this.name,
-      model: this.model,
-      text: 'Mock AI provider response.',
-    };
-  }
-}
-
 export function createProvider(name: AiProviderName, config: AiProviderConfig, apiKey?: string): AiProvider {
   switch (name) {
     case 'anthropic':
@@ -157,8 +120,7 @@ export function createProvider(name: AiProviderName, config: AiProviderConfig, a
     case 'local':
     case 'custom':
       return new LocalOpenAiCompatibleProvider({ config, apiKey });
-    case 'mock':
     default:
-      return new MockProvider();
+      throw new Error(`Unsupported AI provider: ${name}`);
   }
 }

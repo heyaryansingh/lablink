@@ -28,7 +28,7 @@ export class AiClient {
   private async getProvider(): Promise<AiProvider> {
     if (this.provider) return this.provider;
     const name = await this.resolveProviderName();
-    const providerConfig = this.config.ai.providers[name] ?? this.config.ai.providers.mock;
+    const providerConfig = this.config.ai.providers[name];
     if (!providerConfig) throw new Error(`No AI provider config found for ${name}`);
 
     const apiKey =
@@ -45,6 +45,8 @@ export class AiClient {
     if (configured !== 'auto') return configured;
     if (process.env.ANTHROPIC_API_KEY || (await this.credentials.get('lablink.ai', 'anthropic'))) return 'anthropic';
     if (process.env.OPENAI_API_KEY || (await this.credentials.get('lablink.ai', 'openai'))) return 'openai';
-    return 'mock';
+    if (this.config.ai.providers.local?.baseUrl) return 'local';
+    if (this.config.ai.providers.custom?.baseUrl) return 'custom';
+    throw new Error('No real AI provider configured. Set OPENAI_API_KEY, ANTHROPIC_API_KEY, or configure a local/custom endpoint.');
   }
 }

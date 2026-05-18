@@ -24,6 +24,19 @@ lablink --version
 lablink demo
 ```
 
+Real AI commands require a configured provider. Lab Link does not return fake AI responses.
+
+```bash
+$env:OPENAI_API_KEY="..."
+lablink ai status
+lablink ai ask "What should the lab focus on today?"
+lablink ai insights
+lablink schedule plan --ai
+lablink automation run --ai
+```
+
+Anthropic is also supported through `ANTHROPIC_API_KEY`. Local or custom OpenAI-compatible endpoints can be configured with `lablink config set ai.local.baseUrl <url>` or `lablink config set ai.custom.baseUrl <url>`.
+
 ## Current State
 
 This repository is in Phase 1 foundation work and is being prepared for beta npm publication.
@@ -59,7 +72,8 @@ node bin/lablink.mjs ai list
 node bin/lablink.mjs ai approve sug-risk-at8
 ```
 
-The bootstrap runtime includes Command Center, Today, Projects, Meetings, AI Review, Settings, transcript import, deterministic local AI suggestions, and AI suggestion approve/reject commands.
+The bootstrap runtime includes Command Center, Today, Projects, Meetings, AI Review, Settings, transcript import, rules-based review suggestions, and AI suggestion approve/reject commands.
+Transcript import and default schedule/progress flows use labeled rules-based automation unless you run the `--ai` provider-backed commands.
 
 Run the full package release check before publishing:
 

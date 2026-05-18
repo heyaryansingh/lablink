@@ -24,7 +24,7 @@
 | SQLite schema | Partial | Broad schema and migration exist. More v2 tables needed. |
 | Seed data | Partial | Realistic first seed exists. Needs richer demo story and idempotent test coverage. |
 | TUI shell | Partial | Bootstrap TUI has Command Center, Today, Projects, Meetings, AI Review, Settings, search, and command palette. Needs deeper interactions. |
-| AI provider abstraction | Partial | Anthropic/OpenAI/local/mock providers exist. Needs schemas, audit, capability detection, review queue. |
+| AI provider abstraction | Partial | Anthropic/OpenAI/local/custom provider slots exist. Needs schemas, audit, capability detection, review queue. |
 | OAuth adapters | Partial | Microsoft, Google, Zoom flows exist. Need refresh, status, tests, and credentialed validation. |
 | Sync daemon | Partial | One-cycle inbox import exists. Needs cursors, retries, metrics, and provider status. |
 

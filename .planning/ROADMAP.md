@@ -80,7 +80,7 @@
 
 **Plans:**
 
-- 06-01: Provider abstraction for Anthropic, OpenAI, local/custom endpoints.
+- 06-01: Real AI/action beta layer with provider-backed calls, config, insights, scheduling, and automation.
 - 06-02: Prompt registry, JSON parsing, retry/fallback behavior, provenance.
 - 06-03: Task extraction, priority scoring, email tagging, delegation suggestions.
 
@@ -117,4 +117,4 @@
 
 ## Current Focus
 
-Phase 1 resumes next from the v2.2 coordination and institutional-sync path after the product-definition checkpoint.
+Phase 6 is active for the v2.3 real AI/action beta layer, then Phase 7 resumes institutional sync.

@@ -38,7 +38,7 @@ The v2.2 spec assumes the following baseline already exists and must not regress
 - Transcript import exists in bootstrap form.
 - Deterministic local AI suggestion generation exists.
 - AI suggestion approval and rejection exist in bootstrap form.
-- Provider abstraction exists for Anthropic, OpenAI, local/custom, and mock modes.
+- Provider abstraction exists for Anthropic, OpenAI, and real local/custom modes.
 - OAuth adapter scaffolding exists for Microsoft, Google, and Zoom.
 - Feature flags and extension manifests exist as the product shape for future lab customization.
 - Planning docs and GSD/Ralph loop tracking exist.
@@ -181,7 +181,6 @@ Settings should surface:
 
 Support the following providers:
 
-- mock
 - Anthropic
 - OpenAI
 - local OpenAI-compatible endpoint

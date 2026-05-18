@@ -1,6 +1,6 @@
 import type { FeatureFlag, UserRole } from '../core/types';
 
-export type AiProviderName = 'anthropic' | 'openai' | 'local' | 'custom' | 'mock' | 'auto';
+export type AiProviderName = 'anthropic' | 'openai' | 'local' | 'custom' | 'auto';
 
 export interface AiProviderConfig {
   provider: AiProviderName;
