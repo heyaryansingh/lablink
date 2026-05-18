@@ -20,4 +20,5 @@ Build Lab Link according to `LABLINK_PRD.md` using layered GSD execution. After 
 
 | Iteration | Layer | Verification | Result | Follow-up |
 | --- | --- | --- | --- | --- |
-| 1 | Planning/repo setup | Files exist, git repo initialized | In progress | Commit planning docs |
+| 1 | Planning/repo setup | Files exist, git repo initialized | Complete | Commit planning docs |
+| 2 | Foundation scaffold | `git diff --check`; non-ASCII scan; npm install attempt | Verify with blocker | Commit code, resolve npm install, run real validation |
