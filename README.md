@@ -4,6 +4,9 @@ Lab Link is a local-first terminal platform for research labs built as an npm-in
 
 Current release line: beta prerelease. Core workflows are usable, but the product is still incomplete.
 
+Package name: `lablink-cli`
+CLI command: `lablink`
+
 ## Current State
 
 This repository is in Phase 1 foundation work and is being prepared for beta npm publication.
@@ -51,6 +54,24 @@ Install from npm:
 ```bash
 npm install -g lablink-cli@beta
 lablink demo
+```
+
+Run locally:
+
+```bash
+npm run demo
+```
+
+Smoke test:
+
+```bash
+npm run smoke
+```
+
+Publish beta:
+
+```bash
+npm run publish:beta
 ```
 
 ## Architecture
