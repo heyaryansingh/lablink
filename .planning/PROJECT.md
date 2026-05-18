@@ -8,7 +8,8 @@ The product must be robust, technical, flexible, and extensible enough to adapt 
 
 ## Source Of Truth
 
-- Primary requirements: `LABLINK_PRD.md`
+- Primary requirements: `docs/product/PRD_V2_2.md`
+- Lineage: `LABLINK_PRD.md`, `docs/product/PRD_V2.md`, and `docs/product/PRD_V2_1_LAUNCH_SPEC.md`
 - Build method: GSD-style layered execution with atomic plans, summaries, verification, and commits.
 - Iteration method: Ralph-loop inspired pass after each layer: inspect output, remove temporary scaffolding that should not survive, improve the weakest parts, verify, update planning state, commit.
 

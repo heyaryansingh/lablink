@@ -14,8 +14,9 @@
 **Plans:**
 
 - 00-01: PRD v2, capability gap matrix, and GSD state refresh.
+- 00-02: PRD v2.2, validation matrix, and active roadmap refresh.
 
-**Verification:** PRD v2 and gap matrix exist, planning state references them, and product-definition checkpoint is committed.
+**Verification:** PRD v2.2 and gap matrix v2.2 exist, planning state references them, and product-definition checkpoint is committed.
 
 **Status:** Complete.
 
@@ -116,4 +117,4 @@
 
 ## Current Focus
 
-Phase 1 resumes next as Validated Foundation after the product-definition checkpoint.
+Phase 1 resumes next from the v2.2 coordination and institutional-sync path after the product-definition checkpoint.
