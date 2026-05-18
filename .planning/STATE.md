@@ -40,7 +40,7 @@ Completion promise:
 - Shell network access is restricted or npm resolution is stalled: `npm.cmd install` timed out after 180s, and `npm.cmd install --package-lock-only --ignore-scripts` timed out after 90s.
 - One leftover `node.exe` process from npm could not be stopped due Windows process permissions.
 - Because dependencies did not install, TypeScript, Vitest, and tsup validation could not run yet.
-- `git push` may be blocked by the same network/authentication limitations.
+- `git push -u origin main` failed because github.com:443 is unreachable from this sandbox.
 - The PRD examples include mojibake-rendered Unicode from PowerShell; implementation must use clean source strings and ASCII fallbacks.
 - OAuth credentials for Microsoft, Google, and Zoom are user/institution-specific; implementation can provide flows and config but cannot complete live authorization without credentials.
 
