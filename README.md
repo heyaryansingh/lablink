@@ -1,10 +1,10 @@
 # Lab Link
 
-Lab Link is a local-first terminal platform for research labs. It is built from `LABLINK_PRD.md` as an npm-installed CLI named `lablink`.
+Lab Link is a local-first terminal platform for research labs built as an npm-installed CLI named `lablink`.
 
 ## Current State
 
-This repository is in Phase 1 foundation work. The app is being built in GSD layers with a Ralph-loop style verification pass after each layer.
+This repository is in Phase 1 foundation work.
 
 ## Development
 
