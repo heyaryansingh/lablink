@@ -28,7 +28,7 @@
 
 - 01-01: Planning, repository setup, npm project, TypeScript tooling, CI skeleton.
 - 01-02: Launchable zero-dependency bootstrap runtime and npm validation.
-- 01-03: Config, theme, terminal utilities, extension registry, feature flags.
+- 01-03: Interaction stabilization, config surface, terminal utilities, extension registry, feature flags.
 - 01-04: CLI entry point, Ink app shell, navigation skeleton, demo mode.
 
 **Verification:** `npm run smoke`, `npm run test`, `npm run build`, `npm run validate`, and full TypeScript validation where rich dependencies are available.

@@ -404,7 +404,34 @@ Requirements:
 
 The design should feel closer to a mature operator console than to a demo app.
 
-## 14. Data Model Requirements
+## 14. Power And Customizability
+
+Lab Link should expose a controllable product surface rather than a fixed layout.
+
+### User-Facing Controls
+
+- keymaps should be configurable by profile
+- sidebar density should be adjustable
+- panels should be reorderable where practical
+- lab modules should be showable or hideable by profile
+- command surfaces should expose the same actions in demo and full runtime
+- narrow-terminal behavior should degrade into a compact single-pane layout
+
+### Layout And Interaction Rules
+
+- every major section should be reachable by number keys and arrow keys
+- list views should support selection with up/down and view switching with left/right
+- the demo and the real runtime should share the same navigation contract
+- settings should make customization visible rather than hidden in config files
+- the runtime should prefer stable selection state over resetting the screen
+
+### Customization Acceptance
+
+- a lab can adopt the product without accepting one hard-coded workflow
+- the same app can present different modules and defaults for different lab profiles
+- user actions should feel consistent across the demo bootstrap layer and the future rich runtime
+
+## 15. Data Model Requirements
 
 v2.2 expands the core graph with entities such as:
 
@@ -425,7 +452,7 @@ v2.2 expands the core graph with entities such as:
 
 Every entity that comes from AI or import needs provenance and lifecycle state.
 
-## 15. Security, Privacy, And Compliance
+## 16. Security, Privacy, And Compliance
 
 Requirements:
 
@@ -438,7 +465,7 @@ Requirements:
 
 The product is not the system of record for institutional compliance, but it must help users manage compliance-sensitive work responsibly.
 
-## 16. Extensibility Requirements
+## 17. Extensibility Requirements
 
 Extensions should be able to contribute:
 
@@ -454,7 +481,7 @@ Extensions should be able to contribute:
 
 The default extension format should remain declarative unless and until executable extension hooks are explicitly introduced.
 
-## 17. Validation And Acceptance Criteria
+## 18. Validation And Acceptance Criteria
 
 v2.2 is successful when:
 
@@ -469,7 +496,7 @@ v2.2 is successful when:
 - the planning docs reflect reality
 - the product can grow without a rewrite
 
-## 18. GSD Build Plan
+## 19. GSD Build Plan
 
 ### Phase 0: Product Definition v2.2
 
@@ -513,11 +540,10 @@ v2.2 is successful when:
 - docs
 - packaging
 
-## 19. Non-Goals
+## 20. Non-Goals
 
 - replacing institutional systems of record
 - pretending the terminal can join meetings by itself
 - enabling unsafe unattended actions
 - requiring cloud connectivity for core navigation
 - locking the product into a single lab type
-

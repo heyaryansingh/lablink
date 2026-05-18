@@ -23,6 +23,12 @@ const viewLabels = {
   settings: 'Settings',
 };
 
+const commandSections = [
+  { key: 'tasks', label: 'Priority Queue' },
+  { key: 'inbox', label: 'Inbox' },
+  { key: 'risks', label: 'Risk Radar' },
+];
+
 const ansi = {
   reset: '\x1b[0m',
   bold: '\x1b[1m',
@@ -34,6 +40,10 @@ const ansi = {
   gray: '\x1b[38;5;245m',
   dark: '\x1b[38;5;240m',
   clear: '\x1b[2J\x1b[H',
+  home: '\x1b[H',
+  clearBelow: '\x1b[0J',
+  enterAltScreen: '\x1b[?1049h',
+  exitAltScreen: '\x1b[?1049l',
   hideCursor: '\x1b[?25l',
   showCursor: '\x1b[?25h',
 };
@@ -128,6 +138,13 @@ function createSeedStore(nowIso) {
       zoom: true,
       ai: true,
       extensions: true,
+    },
+    ui: {
+      density: 'compact',
+      sidebarWidth: 27,
+      navMode: 'keyboard',
+      keymap: 'default',
+      layout: 'responsive',
     },
     providers: [
       { id: 'mock', label: 'Deterministic Local AI', status: 'active', model: 'lablink-local-rules', lastError: null },
@@ -235,6 +252,10 @@ function repeat(char, count) {
   return char.repeat(Math.max(0, count));
 }
 
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
 function priorityRank(priority) {
   return { critical: 0, high: 1, medium: 2, low: 3 }[priority] ?? 4;
 }
@@ -247,12 +268,22 @@ function statusColor(status) {
   return ansi.gray;
 }
 
+function viewIndex(view) {
+  return views.indexOf(view);
+}
+
+function cycleView(view, delta) {
+  const index = viewIndex(view);
+  if (index < 0) return views[0];
+  return views[(index + delta + views.length) % views.length];
+}
+
 function render(store, state = {}, options = {}) {
-  const width = Math.max(88, Math.min(options.width || process.stdout.columns || 118, 150));
+  const width = Math.max(72, Math.min(options.width || process.stdout.columns || 118, 160));
   const height = Math.max(28, Math.min(options.height || process.stdout.rows || 36, 60));
   const useColor = Boolean(options.color);
   const active = state.view || 'command';
-  const sidebarWidth = width >= 104 ? 27 : 0;
+  const sidebarWidth = width >= 112 ? Math.min(store.ui?.sidebarWidth || 27, Math.max(0, width - 48)) : 0;
   const contentWidth = sidebarWidth ? width - sidebarWidth - 3 : width - 2;
   const lines = [];
 
@@ -327,8 +358,8 @@ function renderSidebar(store, active, width, useColor) {
 
 function renderContent(store, active, width, useColor, state) {
   if (active === 'today') return renderToday(store, width, useColor, state);
-  if (active === 'projects') return renderProjects(store, width, useColor);
-  if (active === 'meetings') return renderMeetings(store, width, useColor);
+  if (active === 'projects') return renderProjects(store, width, useColor, state);
+  if (active === 'meetings') return renderMeetings(store, width, useColor, state);
   if (active === 'ai') return renderAiReview(store, width, useColor, state);
   if (active === 'settings') return renderSettings(store, width, useColor);
   if (active === 'search') return renderSearch(store, width, useColor, state.query || '');
@@ -340,29 +371,51 @@ function section(title, useColor) {
   return bold(title.toUpperCase(), useColor);
 }
 
-function renderCommand(store, width, useColor) {
+function renderCommand(store, width, useColor, state = {}) {
   const lines = [];
   lines.push(section('Command Center', useColor));
   lines.push(color('Operational dashboard fed by inbox, tasks, meetings, AI review, and lab modules.', ansi.gray, useColor));
   lines.push(systemStatus(store, width, useColor));
   lines.push('');
-  lines.push(section('Priority Queue', useColor));
-  for (const task of [...store.tasks].sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority)).slice(0, 5)) {
-    const marker = task.priority === 'critical' ? '!' : task.priority === 'high' ? '*' : '-';
-    lines.push(`${color(marker, statusColor(task.priority), useColor)} ${pad(task.title, Math.max(36, width - 18))} ${pad(daysUntil(task.due), 11)}`);
-    lines.push(color(`  ${projectName(store, task.projectId)} | ${task.assignee} | ${truncate(task.reason, width - 34)}`, ansi.gray, useColor));
-  }
-  lines.push('');
-  lines.push(section('Inbox', useColor));
-  for (const item of store.inbox.slice(0, 4)) {
-    const project = projectName(store, item.projectId);
-    lines.push(`${item.unread ? '*' : 'o'} ${pad(item.source, 8)} ${pad(item.subject, Math.min(42, width - 46))} -> ${project}`);
-    lines.push(color(`  ${item.from} | ${truncate(item.preview, width - 10)}`, ansi.gray, useColor));
-  }
-  lines.push('');
-  lines.push(section('Risk Radar', useColor));
-  for (const risk of store.risks) {
-    lines.push(`${color(risk.severity.toUpperCase().padEnd(6), statusColor(risk.severity), useColor)} ${truncate(`${risk.title} -> ${risk.mitigation}`, width - 10)}`);
+  const focusIndex = state.commandSectionIndex ?? 0;
+  const sections = [
+    {
+      key: 'tasks',
+      title: 'Priority Queue',
+      items: [...store.tasks].sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority)).slice(0, 5),
+      renderItem: (task, index) => {
+        const marker = task.priority === 'critical' ? '!' : task.priority === 'high' ? '*' : '-';
+        const selected = focusIndex === 0 && index === (state.selectedByView?.command ?? 0);
+        lines.push(`${selected ? '>' : ' '} ${color(marker, statusColor(task.priority), useColor)} ${pad(task.title, Math.max(34, width - 20))} ${pad(daysUntil(task.due), 11)}`);
+        lines.push(color(`    ${projectName(store, task.projectId)} | ${task.assignee} | ${truncate(task.reason, width - 38)}`, ansi.gray, useColor));
+      },
+    },
+    {
+      key: 'inbox',
+      title: 'Inbox',
+      items: store.inbox.slice(0, 4),
+      renderItem: (item, index) => {
+        const selected = focusIndex === 1 && index === (state.selectedByView?.command ?? 0);
+        const project = projectName(store, item.projectId);
+        lines.push(`${selected ? '>' : ' '} ${item.unread ? '*' : 'o'} ${pad(item.source, 8)} ${pad(item.subject, Math.min(40, width - 48))} -> ${project}`);
+        lines.push(color(`    ${item.from} | ${truncate(item.preview, width - 12)}`, ansi.gray, useColor));
+      },
+    },
+    {
+      key: 'risks',
+      title: 'Risk Radar',
+      items: store.risks,
+      renderItem: (risk, index) => {
+        const selected = focusIndex === 2 && index === (state.selectedByView?.command ?? 0);
+        lines.push(`${selected ? '>' : ' '} ${color(risk.severity.toUpperCase().padEnd(6), statusColor(risk.severity), useColor)} ${truncate(`${risk.title} -> ${risk.mitigation}`, width - 12)}`);
+      },
+    },
+  ];
+  for (const [sectionIndex, sectionDef] of sections.entries()) {
+    const titleColor = sectionIndex === focusIndex ? ansi.green : ansi.gray;
+    lines.push(color(sectionDef.title, titleColor, useColor));
+    sectionDef.items.forEach((item, index) => sectionDef.renderItem(item, index));
+    lines.push('');
   }
   return lines;
 }
@@ -382,46 +435,90 @@ function visibleTodayTasks(store) {
   return [...store.tasks].sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority));
 }
 
+function selectionCount(store, view) {
+  if (view === 'today') return visibleTodayTasks(store).length;
+  if (view === 'projects') return store.projects.length;
+  if (view === 'meetings') return store.meetings.length + store.meetingArtifacts.length;
+  if (view === 'ai') return store.aiSuggestions.length;
+  if (view === 'command') return commandSections.length;
+  return 0;
+}
+
+function currentSelection(state, view) {
+  return state.selectedByView?.[view] ?? 0;
+}
+
+function setSelection(state, view, value) {
+  state.selectedByView ||= {};
+  state.selectedByView[view] = value;
+}
+
+function moveSelection(store, state, view, delta) {
+  const count = selectionCount(store, view);
+  if (count <= 0) return false;
+  const next = clamp(currentSelection(state, view) + delta, 0, count - 1);
+  if (next === currentSelection(state, view)) return false;
+  setSelection(state, view, next);
+  return true;
+}
+
 function renderToday(store, width, useColor, state = {}) {
   const lines = [section('Today', useColor), color('Ranked by deadline, dependency impact, and AI priority score.', ansi.gray, useColor), ''];
+  const selected = currentSelection(state, 'today');
   let index = 0;
   for (const priority of ['critical', 'high', 'medium', 'low']) {
     const tasks = visibleTodayTasks(store).filter((task) => task.priority === priority);
     if (!tasks.length) continue;
     lines.push(color(priority.toUpperCase(), statusColor(priority), useColor));
     for (const task of tasks) {
-      const selected = state.selected === index;
-      lines.push(`${selected ? '>' : ' '} [${task.status === 'done' ? 'x' : ' '}] ${pad(task.title, Math.max(36, width - 24))} ${pad(daysUntil(task.due), 11)}`);
+      const isSelected = selected === index;
+      lines.push(`${isSelected ? '>' : ' '} [${task.status === 'done' ? 'x' : ' '}] ${pad(task.title, Math.max(36, width - 24))} ${pad(daysUntil(task.due), 11)}`);
       lines.push(color(`      ${projectName(store, task.projectId)} | ${task.assignee} | ${task.source} | Score: ${task.score.toFixed(2)}`, ansi.gray, useColor));
       if (task.quote) lines.push(color(`      "${truncate(task.quote, width - 12)}"`, ansi.dark, useColor));
       index += 1;
     }
     lines.push('');
   }
-  lines.push(color('Actions: j/k move | x mark done | s snooze 1 day', ansi.dark, useColor));
+  lines.push(color('Actions: j/k or arrows move | x mark done | s snooze 1 day | Enter inspect', ansi.dark, useColor));
   return lines;
 }
 
-function renderProjects(store, width, useColor) {
+function renderProjects(store, width, useColor, state = {}) {
   const lines = [section('Projects', useColor), color('Portfolio health, deadlines, and operational blockers.', ansi.gray, useColor), ''];
   lines.push(`${pad('Project', 26)} ${pad('Status', 10)} ${pad('Done', 6)} ${pad('Deadline', 12)} Owner`);
   lines.push(repeat('-', Math.min(width - 2, 76)));
-  for (const project of store.projects) {
-    lines.push(`${pad(`${project.icon} ${project.name}`, 26)} ${color(pad(project.status, 10), statusColor(project.status), useColor)} ${pad(`${project.completion}%`, 6)} ${pad(formatDate(project.nextDeadline), 12)} ${project.owner}`);
-    lines.push(color(`  ${truncate(project.health, width - 6)}`, ansi.gray, useColor));
+  const selected = currentSelection(state, 'projects');
+  for (const [index, project] of store.projects.entries()) {
+    const marker = index === selected ? '>' : ' ';
+    lines.push(`${marker} ${pad(`${project.icon} ${project.name}`, 24)} ${color(pad(project.status, 10), statusColor(project.status), useColor)} ${pad(`${project.completion}%`, 6)} ${pad(formatDate(project.nextDeadline), 12)} ${project.owner}`);
+    lines.push(color(`    ${truncate(project.health, width - 8)}`, ansi.gray, useColor));
   }
   lines.push('');
   lines.push(section('Feature-Flagged Lab Modules', useColor));
   const enabled = Object.entries(store.featureFlags).filter(([, value]) => value).map(([key]) => key).join(', ');
   lines.push(color(truncate(enabled, width - 2), ansi.gray, useColor));
+  lines.push(color('Actions: arrows move | Enter inspect | 3 open view', ansi.dark, useColor));
   return lines;
 }
 
-function renderMeetings(store, width, useColor) {
+function renderMeetings(store, width, useColor, state = {}) {
   const lines = [section('Meeting Intelligence', useColor), color('Zoom transcripts, imported notes, AI decisions, tasks, risks, and follow-ups.', ansi.gray, useColor), ''];
-  for (const meeting of store.meetings) {
-    lines.push(`${pad(formatDate(meeting.at), 8)} ${pad(meeting.title, Math.min(34, width - 48))} ${color(pad(meeting.status, 11), statusColor(meeting.status), useColor)} ${meeting.type}`);
-    lines.push(color(`  ${truncate(meeting.summary, width - 6)}`, ansi.gray, useColor));
+  const selected = currentSelection(state, 'meetings');
+  const rows = [
+    ...store.meetings.map((meeting) => ({ kind: 'meeting', item: meeting })),
+    ...store.meetingArtifacts.map((artifact) => ({ kind: 'artifact', item: artifact })),
+  ];
+  for (const [index, row] of rows.entries()) {
+    const marker = index === selected ? '>' : ' ';
+    if (row.kind === 'meeting') {
+      const meeting = row.item;
+      lines.push(`${marker} ${pad(formatDate(meeting.at), 8)} ${pad(meeting.title, Math.min(34, width - 48))} ${color(pad(meeting.status, 11), statusColor(meeting.status), useColor)} ${meeting.type}`);
+      lines.push(color(`    ${truncate(meeting.summary, width - 8)}`, ansi.gray, useColor));
+    } else {
+      const artifact = row.item;
+      lines.push(`${marker} ${pad(artifact.kind, 8)} ${pad(artifact.source, 22)} ${pad(artifact.status, 10)} ${formatDate(artifact.importedAt)}`);
+      lines.push(color(`    ${truncate(artifact.excerpt, width - 8)}`, ansi.gray, useColor));
+    }
   }
   lines.push('');
   lines.push(section('Artifacts', useColor));
@@ -435,6 +532,7 @@ function renderMeetings(store, width, useColor) {
   const bot = store.integrations.find((item) => item.id === 'bot');
   lines.push(`Zoom Cloud Recording Import: ${color(zoom.status, statusColor(zoom.status), useColor)} - ${zoom.nextStep}`);
   lines.push(`External Notes Bot: ${color(bot.status, statusColor(bot.status), useColor)} - ${bot.nextStep}`);
+  lines.push(color('Actions: arrows move | Enter inspect | 4 open view', ansi.dark, useColor));
   return lines;
 }
 
@@ -447,12 +545,15 @@ function renderAiReview(store, width, useColor, state = {}) {
   ];
   lines.push(`${pad('Type', 10)} ${pad('State', 10)} ${pad('Conf', 6)} ${pad('Target', 22)} Suggestion`);
   lines.push(repeat('-', Math.min(width - 2, 90)));
+  const selected = currentSelection(state, 'ai');
   store.aiSuggestions.forEach((suggestion, index) => {
-    const marker = state.selected === index ? '>' : ' ';
+    const marker = selected === index ? '>' : ' ';
     lines.push(`${marker} ${pad(suggestion.type, 9)} ${color(pad(suggestion.status, 10), statusColor(suggestion.status), useColor)} ${pad(String(Math.round(suggestion.confidence * 100)), 6)} ${pad(suggestion.target, 22)} ${truncate(suggestion.title, width - 56)}`);
     lines.push(color(`  Source: ${suggestion.source} | "${truncate(suggestion.quote, width - 22)}"`, ansi.gray, useColor));
     lines.push(color(`  Reason: ${truncate(suggestion.reason, width - 12)}`, ansi.dark, useColor));
   });
+  lines.push('');
+  lines.push(color('Actions: arrows move | a approve | r reject | Enter inspect', ansi.dark, useColor));
   return lines;
 }
 
@@ -460,6 +561,9 @@ function renderSettings(store, width, useColor) {
   const lines = [section('Settings', useColor), color('Transparent runtime, provider, integration, and module status.', ansi.gray, useColor), ''];
   lines.push(`Lab: ${store.lab.name} | ${store.lab.institution}`);
   lines.push(`Runtime: ${store.lab.runtime} | Data schema: ${store.schemaVersion}`);
+  if (store.ui) {
+    lines.push(`UI: ${store.ui.density} density | sidebar ${store.ui.sidebarWidth || 'auto'} | ${store.ui.layout}`);
+  }
   lines.push('');
   lines.push(section('AI Providers', useColor));
   for (const provider of store.providers) {
@@ -473,6 +577,8 @@ function renderSettings(store, width, useColor) {
   lines.push('');
   lines.push(section('Enabled Modules', useColor));
   lines.push(Object.entries(store.featureFlags).map(([key, value]) => `${value ? 'on ' : 'off'} ${key}`).join('  '));
+  lines.push('');
+  lines.push(color('Customizability: profiles, modules, keymaps, and layout presets are reflected in the next runtime layers.', ansi.dark, useColor));
   return lines;
 }
 
@@ -514,57 +620,160 @@ function renderPalette(width, useColor) {
 
 function statusBar(width, active, useColor, message = '') {
   const left = ` ${viewLabels[active] || active}`;
-  const right = message ? ` ${truncate(message, 42)} ` : '1-6 nav  / search  ? palette  q quit ';
+  const right = message ? ` ${truncate(message, 42)} ` : '1-6 nav  arrows move  / search  ? palette  q quit ';
   return color(left, ansi.green, useColor) + color(pad('', Math.max(1, width - left.length - right.length)), ansi.gray, useColor) + color(right, message ? ansi.yellow : ansi.gray, useColor);
 }
 
 function runInteractive(context) {
-  const state = { view: 'command', query: '', selected: 0, message: '' };
+  const state = {
+    view: 'command',
+    query: '',
+    message: '',
+    selectedByView: {
+      command: 0,
+      today: 0,
+      projects: 0,
+      meetings: 0,
+      ai: 0,
+    },
+    commandSectionIndex: 0,
+  };
   const useColor = true;
-  const draw = () => {
-    process.stdout.write(ansi.clear + ansi.hideCursor);
-    process.stdout.write(render(context.store, state, { color: useColor }));
+  let needsClear = true;
+  const paint = () => {
+    const frame = render(context.store, state, { color: useColor });
+    process.stdout.write((needsClear ? ansi.clear : ansi.home) + ansi.hideCursor + frame);
+    needsClear = false;
   };
 
   readline.emitKeypressEvents(process.stdin);
   if (process.stdin.isTTY) process.stdin.setRawMode(true);
-  process.on('exit', () => process.stdout.write(ansi.showCursor));
+  process.stdout.write(ansi.enterAltScreen);
+  process.on('exit', () => process.stdout.write(ansi.showCursor + ansi.exitAltScreen));
+  process.stdout.on('resize', () => {
+    needsClear = true;
+    paint();
+  });
+
+  const enterView = (view) => {
+    state.view = view;
+    state.message = `Opened ${viewLabels[view] || view}`;
+    if (view === 'command') {
+      state.commandSectionIndex = clamp(state.commandSectionIndex, 0, commandSections.length - 1);
+    }
+    paint();
+  };
+
+  const moveView = (delta) => {
+    state.view = cycleView(state.view, delta);
+    state.message = `Opened ${viewLabels[state.view] || state.view}`;
+    paint();
+  };
+
+  const ensureViewSelection = (view) => {
+    const count = selectionCount(context.store, view);
+    if (count <= 0) return;
+    const current = currentSelection(state, view);
+    setSelection(state, view, clamp(current, 0, count - 1));
+  };
+
+  const inspectCurrentSelection = () => {
+    if (state.view === 'today') {
+      const task = visibleTodayTasks(context.store)[currentSelection(state, 'today')];
+      if (task) state.message = `${task.title} | ${projectName(context.store, task.projectId)} | ${task.assignee}`;
+    } else if (state.view === 'projects') {
+      const project = context.store.projects[currentSelection(state, 'projects')];
+      if (project) state.message = `${project.name} | ${project.status} | ${project.completion}%`;
+    } else if (state.view === 'meetings') {
+      const rows = [
+        ...context.store.meetings.map((meeting) => ({ kind: 'meeting', item: meeting })),
+        ...context.store.meetingArtifacts.map((artifact) => ({ kind: 'artifact', item: artifact })),
+      ];
+      const row = rows[currentSelection(state, 'meetings')];
+      if (row?.kind === 'meeting') state.message = `${row.item.title} | ${row.item.status}`;
+      else if (row?.kind === 'artifact') state.message = `${row.item.source} | ${row.item.kind}`;
+    } else if (state.view === 'ai') {
+      const suggestion = context.store.aiSuggestions[currentSelection(state, 'ai')];
+      if (suggestion) state.message = `${suggestion.type}: ${suggestion.title}`;
+    } else if (state.view === 'command') {
+      const section = commandSections[state.commandSectionIndex];
+      if (section) state.message = section.label;
+    }
+    paint();
+  };
 
   process.stdin.on('keypress', (str, key = {}) => {
     if ((key.ctrl && key.name === 'c') || str === 'q') {
-      process.stdout.write(ansi.showCursor + '\n');
+      process.stdout.write(ansi.showCursor + ansi.exitAltScreen + '\n');
       process.exit(0);
     }
+    if (key.name === 'left') {
+      moveView(-1);
+      return;
+    }
+    if (key.name === 'right') {
+      moveView(1);
+      return;
+    }
     if (views[Number(str) - 1]) {
-      state.view = views[Number(str) - 1];
+      enterView(views[Number(str) - 1]);
       state.query = '';
-      state.selected = 0;
-      state.message = '';
+      return;
     } else if (str === '?') {
       state.view = 'palette';
-      state.selected = 0;
+      state.message = 'Command palette opened';
+      paint();
+      return;
     } else if (str === '/') {
       state.view = 'search';
       state.query = '';
-      state.selected = 0;
+      state.message = 'Search mode';
+      paint();
+      return;
     } else if (state.view === 'search') {
       if (key.name === 'backspace') state.query = state.query.slice(0, -1);
+      else if (key.name === 'escape') enterView('command');
       else if (str && str >= ' ' && str <= '~') state.query += str;
-    } else if (str === 'j' || key.name === 'down') {
-      state.selected = Math.min(itemCount(context.store, state.view) - 1, state.selected + 1);
-    } else if (str === 'k' || key.name === 'up') {
-      state.selected = Math.max(0, state.selected - 1);
-    } else if (state.view === 'today' && str === 'x') {
-      const task = visibleTodayTasks(context.store)[state.selected];
+      paint();
+      return;
+    } else if (state.view === 'command' && (key.name === 'up' || key.name === 'down')) {
+      const delta = key.name === 'up' ? -1 : 1;
+      state.commandSectionIndex = clamp(state.commandSectionIndex + delta, 0, commandSections.length - 1);
+      setSelection(state, 'command', clamp(currentSelection(state, 'command'), 0, selectionCount(context.store, 'command') - 1));
+      state.message = `Focused ${commandSections[state.commandSectionIndex].label}`;
+      paint();
+      return;
+    } else if (state.view === 'command' && (str === 'j' || str === 'k')) {
+      const delta = str === 'k' ? -1 : 1;
+      state.commandSectionIndex = clamp(state.commandSectionIndex + delta, 0, commandSections.length - 1);
+      state.message = `Focused ${commandSections[state.commandSectionIndex].label}`;
+      paint();
+      return;
+    } else if (state.view === 'today' || state.view === 'projects' || state.view === 'meetings' || state.view === 'ai') {
+      const delta = key.name === 'up' || str === 'k' ? -1 : key.name === 'down' || str === 'j' ? 1 : 0;
+      if (delta !== 0) {
+        const changed = moveSelection(context.store, state, state.view, delta);
+        if (changed) {
+          state.message = `Selected ${viewLabels[state.view] || state.view}`;
+          paint();
+        }
+        return;
+      }
+    }
+
+    if (state.view === 'today' && str === 'x') {
+      const task = visibleTodayTasks(context.store)[currentSelection(state, 'today')];
       if (task) {
         task.status = 'done';
         task.completedAt = new Date().toISOString();
         context.store.auditLog.push({ id: `audit-${Date.now()}`, at: new Date().toISOString(), actor: context.store.user.id, action: 'task_done', detail: task.title });
         saveStore(context);
         state.message = `Marked done: ${truncate(task.title, 28)}`;
+        paint();
+        return;
       }
     } else if (state.view === 'today' && str === 's') {
-      const task = visibleTodayTasks(context.store)[state.selected];
+      const task = visibleTodayTasks(context.store)[currentSelection(state, 'today')];
       if (task) {
         const base = task.due ? new Date(`${task.due}T12:00:00`) : new Date();
         base.setDate(base.getDate() + 1);
@@ -572,27 +781,41 @@ function runInteractive(context) {
         context.store.auditLog.push({ id: `audit-${Date.now()}`, at: new Date().toISOString(), actor: context.store.user.id, action: 'task_snoozed', detail: task.title });
         saveStore(context);
         state.message = `Snoozed: ${truncate(task.title, 32)}`;
+        paint();
+        return;
       }
     } else if (state.view === 'ai' && str === 'a') {
-      const suggestion = context.store.aiSuggestions[state.selected];
+      const suggestion = context.store.aiSuggestions[currentSelection(state, 'ai')];
       if (suggestion) {
         const result = approveSuggestionInStore(context.store, suggestion.id);
         saveStore(context);
         state.message = `Approved ${suggestion.type}${result.created ? ` -> ${result.created.id}` : ''}`;
+        ensureViewSelection('ai');
+        paint();
+        return;
       }
     } else if (state.view === 'ai' && str === 'r') {
-      const suggestion = context.store.aiSuggestions[state.selected];
+      const suggestion = context.store.aiSuggestions[currentSelection(state, 'ai')];
       if (suggestion) {
         suggestion.status = 'rejected';
         context.store.auditLog.push({ id: `audit-${Date.now()}`, at: new Date().toISOString(), actor: context.store.user.id, action: 'ai_suggestion_rejected', detail: `${suggestion.type}: ${suggestion.title}` });
         saveStore(context);
         state.message = `Rejected ${suggestion.id}`;
+        ensureViewSelection('ai');
+        paint();
+        return;
       }
+    } else if (key.name === 'enter' || key.name === 'return') {
+      inspectCurrentSelection();
+      return;
+    } else if (key.name === 'escape') {
+      enterView('command');
+      return;
     }
-    draw();
+    paint();
   });
 
-  draw();
+  paint();
 }
 
 function itemCount(store, view) {
@@ -794,6 +1017,9 @@ function runTests() {
   const snapshot = render(context.store, { view: 'command' }, { width: 118, height: 34, color: false });
   assert(snapshot.includes('Command Center'), 'snapshot includes Command Center');
   assert(snapshot.includes('Tau Pathology Study'), 'snapshot includes demo project');
+  assert(snapshot.includes('arrows move'), 'snapshot includes keyboard guidance');
+  assert(cycleView('command', 1) === 'today', 'view cycling works');
+  assert(selectionCount(context.store, 'today') > 0, 'today list is selectable');
   const suggestions = createSuggestionsFromTranscript('Jordan will check AT8 suppliers.\nDecision: use cohort 2 for imaging.\nRisk: library QC is delayed.', 'test');
   assert(suggestions.length >= 3, 'transcript extraction creates suggestions');
   assert(suggestions.some((item) => item.type === 'task'), 'task suggestion exists');

@@ -3,8 +3,8 @@
 ## Current Position
 
 - Date: 2026-05-18 America/Chicago
-- Phase: 0 - Product Definition
-- Plan: 00-02
+- Phase: 1 - Foundation
+- Plan: 01-03
 - Status: Complete
 - Repository: standalone git repo initialized in `C:\Aryan\GitHub Projects\lablink`
 - Remote: `origin` configured as `https://github.com/heyaryansingh/lablink.git`
@@ -14,6 +14,7 @@
 - npm is the package manager.
 - PRD design system is the default theme.
 - Symbols are configurable and support ASCII fallback.
+- Demo and full runtime should share a stable keyboard and selection contract.
 - AI provider layer is configurable and provider-neutral.
 - OAuth is implemented as real adapter code, with local/demo fallbacks.
 - Lab modules are feature flagged and extension-ready.
@@ -49,8 +50,7 @@ Completion promise:
 
 ## Next Actions
 
-- Begin implementation from the v2.2 coordination path.
-- Build richer meeting summaries and follow-up coordination objects.
+- Build richer coordination objects around tasks, meetings, inbox, and follow-ups.
 - Add institutional email/calendar sync adapters.
 - Add Slack and Notion integration surfaces.
-- Add lab profile and tracking expansion.
+- Continue expanding lab-profile-driven customization.
