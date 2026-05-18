@@ -2,9 +2,9 @@
 
 ## Current Position
 
-- Date: 2026-05-17 America/Chicago
-- Phase: 1 - Foundation
-- Plan: 01-01
+- Date: 2026-05-18 America/Chicago
+- Phase: 0 - Product Definition
+- Plan: 00-01
 - Status: Verify
 - Repository: standalone git repo initialized in `C:\Aryan\GitHub Projects\lablink`
 - Remote: `origin` configured as `https://github.com/heyaryansingh/lablink.git`
@@ -18,6 +18,8 @@
 - OAuth is implemented as real adapter code, with local/demo fallbacks.
 - Lab modules are feature flagged and extension-ready.
 - Local single-user is the first runtime, with server-ready boundaries.
+- PRD v2 is the active build-grade specification: `docs/product/PRD_V2.md`.
+- Capability gap tracking is active: `docs/product/CAPABILITY_GAP.md`.
 
 ## Ralph Loop Ledger
 
@@ -46,8 +48,9 @@ Completion promise:
 
 ## Next Actions
 
-- Resolve npm install/network issue and generate `package-lock.json`.
+- Commit product-definition checkpoint.
+- Resume Phase 1 as "Validated Foundation": resolve npm install/network issue and generate `package-lock.json`.
 - Run `npm.cmd run typecheck`, `npm.cmd run test`, and `npm.cmd run build`.
-- Fix any compile/runtime issues found by real validation.
-- Build Phase 1 Plan 01-02: config/init wizard polish and first interactive task action.
+- Fix validation failures before adding more surface area.
+- Implement the P0 path from `docs/product/CAPABILITY_GAP.md`: demo launch, v2 data tables, meeting import, AI review queue.
 - Attempt `git push -u origin main` when network/authentication allows it.

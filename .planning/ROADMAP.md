@@ -7,6 +7,18 @@
 - Verify: code exists and is under validation/refinement
 - Complete: implemented, verified, summarized, and committed
 
+## Phase 0: Product Definition
+
+**Goal:** Establish the active build-grade specification and capability gap before continuing implementation.
+
+**Plans:**
+
+- 00-01: PRD v2, capability gap matrix, and GSD state refresh.
+
+**Verification:** PRD v2 and gap matrix exist, planning state references them, and product-definition checkpoint is committed.
+
+**Status:** Complete.
+
 ## Phase 1: Foundation
 
 **Goal:** Create a standalone, maintainable TypeScript CLI project that follows the PRD and GSD/Ralph workflow.
@@ -103,4 +115,4 @@
 
 ## Current Focus
 
-Phase 1 is active.
+Phase 1 resumes next as Validated Foundation after the product-definition checkpoint.
