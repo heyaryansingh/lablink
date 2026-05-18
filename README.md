@@ -2,14 +2,17 @@
 
 Lab Link is a local-first terminal platform for research labs built as an npm-installed CLI named `lablink`.
 
+Current release line: beta prerelease. Core workflows are usable, but the product is still incomplete.
+
 ## Current State
 
-This repository is in Phase 1 foundation work.
+This repository is in Phase 1 foundation work and is being prepared for beta npm publication.
 
 ## Development
 
 ```bash
 npm install
+npm run pack:dry
 npm run smoke
 npm run validate
 npm run dev
@@ -36,6 +39,12 @@ node bin/lablink.mjs ai approve sug-risk-at8
 ```
 
 The bootstrap runtime includes Command Center, Today, Projects, Meetings, AI Review, Settings, transcript import, deterministic local AI suggestions, and AI suggestion approve/reject commands.
+
+Beta publish command:
+
+```bash
+npm run publish:beta
+```
 
 ## Architecture
 

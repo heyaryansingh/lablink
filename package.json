@@ -1,9 +1,30 @@
 {
   "name": "@lablink/cli",
-  "version": "0.1.0",
+  "version": "0.1.0-beta.0",
   "description": "Local-first terminal operating system for research labs",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/heyaryansingh/lablink.git"
+  },
+  "bugs": {
+    "url": "https://github.com/heyaryansingh/lablink/issues"
+  },
+  "homepage": "https://github.com/heyaryansingh/lablink#readme",
+  "keywords": [
+    "lab",
+    "terminal",
+    "cli",
+    "research",
+    "productivity",
+    "ai",
+    "meetings",
+    "oauth"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
     "lablink": "./bin/lablink.mjs"
   },
@@ -19,6 +40,7 @@
     "node": ">=20.0.0"
   },
   "scripts": {
+    "prepack": "npm run build",
     "build": "node bin/lablink.mjs build",
     "dev": "node bin/lablink.mjs demo",
     "demo": "node bin/lablink.mjs demo",
@@ -33,7 +55,9 @@
     "full:dev": "tsx src/cli.ts",
     "full:typecheck": "tsc --noEmit",
     "full:test": "vitest run",
-    "full:build": "tsup"
+    "full:build": "tsup",
+    "pack:dry": "npm pack --dry-run",
+    "publish:beta": "npm publish --tag beta --access public"
   },
   "dependencies": {},
   "devDependencies": {},
