@@ -73,6 +73,11 @@ function writeJson(file, value) {
 function loadStore(options = {}) {
   const dir = dataDir(options);
   const file = storePath(dir);
+  if (options.fresh) {
+    const seeded = createSeedStore(DEFAULT_NOW);
+    writeJson(file, seeded);
+    return { dir, file, store: seeded };
+  }
   const store = readJson(file, null);
   if (store) return { dir, file, store };
   const seeded = createSeedStore(DEFAULT_NOW);
@@ -216,9 +221,14 @@ function truncate(value, width) {
   return `${input.slice(0, width - 3)}...`;
 }
 
+function stripAnsi(value) {
+  return String(value).replace(/\x1b\[[0-9;]*m/g, '');
+}
+
 function pad(value, width) {
-  const input = truncate(value, width);
-  return input + ' '.repeat(Math.max(0, width - input.length));
+  const raw = String(value ?? '');
+  const input = raw.includes('\x1b') ? raw : truncate(raw, width);
+  return input + ' '.repeat(Math.max(0, width - stripAnsi(input).length));
 }
 
 function repeat(char, count) {
@@ -264,7 +274,7 @@ function render(store, state = {}, options = {}) {
   }
 
   lines.push(border(width));
-  lines.push(statusBar(width, active, useColor));
+  lines.push(statusBar(width, active, useColor, state.message || ''));
   return lines.join('\n');
 }
 
@@ -316,10 +326,10 @@ function renderSidebar(store, active, width, useColor) {
 }
 
 function renderContent(store, active, width, useColor, state) {
-  if (active === 'today') return renderToday(store, width, useColor);
+  if (active === 'today') return renderToday(store, width, useColor, state);
   if (active === 'projects') return renderProjects(store, width, useColor);
   if (active === 'meetings') return renderMeetings(store, width, useColor);
-  if (active === 'ai') return renderAiReview(store, width, useColor);
+  if (active === 'ai') return renderAiReview(store, width, useColor, state);
   if (active === 'settings') return renderSettings(store, width, useColor);
   if (active === 'search') return renderSearch(store, width, useColor, state.query || '');
   if (active === 'palette') return renderPalette(width, useColor);
@@ -368,19 +378,27 @@ function systemStatus(store, width, useColor) {
   );
 }
 
-function renderToday(store, width, useColor) {
+function visibleTodayTasks(store) {
+  return [...store.tasks].sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority));
+}
+
+function renderToday(store, width, useColor, state = {}) {
   const lines = [section('Today', useColor), color('Ranked by deadline, dependency impact, and AI priority score.', ansi.gray, useColor), ''];
+  let index = 0;
   for (const priority of ['critical', 'high', 'medium', 'low']) {
-    const tasks = store.tasks.filter((task) => task.priority === priority);
+    const tasks = visibleTodayTasks(store).filter((task) => task.priority === priority);
     if (!tasks.length) continue;
     lines.push(color(priority.toUpperCase(), statusColor(priority), useColor));
     for (const task of tasks) {
-      lines.push(`  [${task.status === 'done' ? 'x' : ' '}] ${pad(task.title, Math.max(38, width - 22))} ${pad(daysUntil(task.due), 11)}`);
+      const selected = state.selected === index;
+      lines.push(`${selected ? '>' : ' '} [${task.status === 'done' ? 'x' : ' '}] ${pad(task.title, Math.max(36, width - 24))} ${pad(daysUntil(task.due), 11)}`);
       lines.push(color(`      ${projectName(store, task.projectId)} | ${task.assignee} | ${task.source} | Score: ${task.score.toFixed(2)}`, ansi.gray, useColor));
       if (task.quote) lines.push(color(`      "${truncate(task.quote, width - 12)}"`, ansi.dark, useColor));
+      index += 1;
     }
     lines.push('');
   }
+  lines.push(color('Actions: j/k move | x mark done | s snooze 1 day', ansi.dark, useColor));
   return lines;
 }
 
@@ -420,7 +438,7 @@ function renderMeetings(store, width, useColor) {
   return lines;
 }
 
-function renderAiReview(store, width, useColor) {
+function renderAiReview(store, width, useColor, state = {}) {
   const lines = [
     section('AI Review Queue', useColor),
     color('Every suggestion has source, confidence, quote, and approval state.', ansi.gray, useColor),
@@ -429,11 +447,12 @@ function renderAiReview(store, width, useColor) {
   ];
   lines.push(`${pad('Type', 10)} ${pad('State', 10)} ${pad('Conf', 6)} ${pad('Target', 22)} Suggestion`);
   lines.push(repeat('-', Math.min(width - 2, 90)));
-  for (const suggestion of store.aiSuggestions) {
-    lines.push(`${pad(suggestion.type, 10)} ${color(pad(suggestion.status, 10), statusColor(suggestion.status), useColor)} ${pad(String(Math.round(suggestion.confidence * 100)), 6)} ${pad(suggestion.target, 22)} ${truncate(suggestion.title, width - 54)}`);
+  store.aiSuggestions.forEach((suggestion, index) => {
+    const marker = state.selected === index ? '>' : ' ';
+    lines.push(`${marker} ${pad(suggestion.type, 9)} ${color(pad(suggestion.status, 10), statusColor(suggestion.status), useColor)} ${pad(String(Math.round(suggestion.confidence * 100)), 6)} ${pad(suggestion.target, 22)} ${truncate(suggestion.title, width - 56)}`);
     lines.push(color(`  Source: ${suggestion.source} | "${truncate(suggestion.quote, width - 22)}"`, ansi.gray, useColor));
     lines.push(color(`  Reason: ${truncate(suggestion.reason, width - 12)}`, ansi.dark, useColor));
-  }
+  });
   return lines;
 }
 
@@ -493,14 +512,14 @@ function renderPalette(width, useColor) {
   ];
 }
 
-function statusBar(width, active, useColor) {
+function statusBar(width, active, useColor, message = '') {
   const left = ` ${viewLabels[active] || active}`;
-  const right = '1-6 nav  / search  ? palette  q quit ';
-  return color(left, ansi.green, useColor) + color(pad('', Math.max(1, width - left.length - right.length)), ansi.gray, useColor) + color(right, ansi.gray, useColor);
+  const right = message ? ` ${truncate(message, 42)} ` : '1-6 nav  / search  ? palette  q quit ';
+  return color(left, ansi.green, useColor) + color(pad('', Math.max(1, width - left.length - right.length)), ansi.gray, useColor) + color(right, message ? ansi.yellow : ansi.gray, useColor);
 }
 
 function runInteractive(context) {
-  const state = { view: 'command', query: '' };
+  const state = { view: 'command', query: '', selected: 0, message: '' };
   const useColor = true;
   const draw = () => {
     process.stdout.write(ansi.clear + ansi.hideCursor);
@@ -519,19 +538,67 @@ function runInteractive(context) {
     if (views[Number(str) - 1]) {
       state.view = views[Number(str) - 1];
       state.query = '';
+      state.selected = 0;
+      state.message = '';
     } else if (str === '?') {
       state.view = 'palette';
+      state.selected = 0;
     } else if (str === '/') {
       state.view = 'search';
       state.query = '';
+      state.selected = 0;
     } else if (state.view === 'search') {
       if (key.name === 'backspace') state.query = state.query.slice(0, -1);
       else if (str && str >= ' ' && str <= '~') state.query += str;
+    } else if (str === 'j' || key.name === 'down') {
+      state.selected = Math.min(itemCount(context.store, state.view) - 1, state.selected + 1);
+    } else if (str === 'k' || key.name === 'up') {
+      state.selected = Math.max(0, state.selected - 1);
+    } else if (state.view === 'today' && str === 'x') {
+      const task = visibleTodayTasks(context.store)[state.selected];
+      if (task) {
+        task.status = 'done';
+        task.completedAt = new Date().toISOString();
+        context.store.auditLog.push({ id: `audit-${Date.now()}`, at: new Date().toISOString(), actor: context.store.user.id, action: 'task_done', detail: task.title });
+        saveStore(context);
+        state.message = `Marked done: ${truncate(task.title, 28)}`;
+      }
+    } else if (state.view === 'today' && str === 's') {
+      const task = visibleTodayTasks(context.store)[state.selected];
+      if (task) {
+        const base = task.due ? new Date(`${task.due}T12:00:00`) : new Date();
+        base.setDate(base.getDate() + 1);
+        task.due = base.toISOString().slice(0, 10);
+        context.store.auditLog.push({ id: `audit-${Date.now()}`, at: new Date().toISOString(), actor: context.store.user.id, action: 'task_snoozed', detail: task.title });
+        saveStore(context);
+        state.message = `Snoozed: ${truncate(task.title, 32)}`;
+      }
+    } else if (state.view === 'ai' && str === 'a') {
+      const suggestion = context.store.aiSuggestions[state.selected];
+      if (suggestion) {
+        const result = approveSuggestionInStore(context.store, suggestion.id);
+        saveStore(context);
+        state.message = `Approved ${suggestion.type}${result.created ? ` -> ${result.created.id}` : ''}`;
+      }
+    } else if (state.view === 'ai' && str === 'r') {
+      const suggestion = context.store.aiSuggestions[state.selected];
+      if (suggestion) {
+        suggestion.status = 'rejected';
+        context.store.auditLog.push({ id: `audit-${Date.now()}`, at: new Date().toISOString(), actor: context.store.user.id, action: 'ai_suggestion_rejected', detail: `${suggestion.type}: ${suggestion.title}` });
+        saveStore(context);
+        state.message = `Rejected ${suggestion.id}`;
+      }
     }
     draw();
   });
 
   draw();
+}
+
+function itemCount(store, view) {
+  if (view === 'today') return visibleTodayTasks(store).length;
+  if (view === 'ai') return store.aiSuggestions.length;
+  return 1;
 }
 
 function normalizeTranscript(text) {
@@ -640,19 +707,25 @@ function importMeeting(file, options) {
 
 function approveSuggestion(id, options) {
   const context = loadStore(options);
-  const suggestion = context.store.aiSuggestions.find((item) => item.id === id);
+  const result = approveSuggestionInStore(context.store, id);
+  saveStore(context);
+  return { context, ...result };
+}
+
+function approveSuggestionInStore(store, id) {
+  const suggestion = store.aiSuggestions.find((item) => item.id === id);
   if (!suggestion) throw new Error(`AI suggestion not found: ${id}`);
-  if (suggestion.status === 'approved') return { context, suggestion, created: null };
+  if (suggestion.status === 'approved') return { suggestion, created: null };
   suggestion.status = 'approved';
 
   let created = null;
-  const projectId = context.store.projects.find((project) => project.name === suggestion.target)?.id || null;
+  const projectId = store.projects.find((project) => project.name === suggestion.target)?.id || null;
   if (suggestion.type === 'task' || suggestion.type === 'follow-up') {
     created = {
       id: `task-${Date.now()}`,
       title: suggestion.title,
       projectId,
-      assignee: context.store.user.name,
+      assignee: store.user.name,
       priority: suggestion.confidence >= 0.85 ? 'high' : 'medium',
       status: 'todo',
       due: null,
@@ -661,7 +734,7 @@ function approveSuggestion(id, options) {
       reason: suggestion.reason,
       score: suggestion.confidence,
     };
-    context.store.tasks.push(created);
+    store.tasks.push(created);
   } else if (suggestion.type === 'risk') {
     created = {
       id: `risk-${Date.now()}`,
@@ -670,9 +743,9 @@ function approveSuggestion(id, options) {
       title: suggestion.title,
       mitigation: 'Review owner, dependency, and mitigation in next project sync.',
     };
-    context.store.risks.push(created);
+    store.risks.push(created);
   } else if (suggestion.type === 'decision') {
-    context.store.decisions ||= [];
+    store.decisions ||= [];
     created = {
       id: `decision-${Date.now()}`,
       projectId,
@@ -680,18 +753,17 @@ function approveSuggestion(id, options) {
       source: suggestion.source,
       quote: suggestion.quote,
     };
-    context.store.decisions.push(created);
+    store.decisions.push(created);
   }
 
-  context.store.auditLog.push({
+  store.auditLog.push({
     id: `audit-${Date.now()}`,
     at: new Date().toISOString(),
-    actor: context.store.user.id,
+    actor: store.user.id,
     action: 'ai_suggestion_approved',
     detail: `${suggestion.type}: ${suggestion.title}`,
   });
-  saveStore(context);
-  return { context, suggestion, created };
+  return { suggestion, created };
 }
 
 function rejectSuggestion(id, options) {
@@ -759,7 +831,7 @@ function validate() {
   check();
   runTests();
   build();
-  const context = loadStore({ demo: true });
+  const context = loadStore({ demo: true, fresh: true });
   const snapshot = render(context.store, { view: 'command' }, { width: 118, height: 34, color: false });
   assert(snapshot.includes('AI Review'), 'validated snapshot includes AI Review navigation');
   process.stdout.write('Validation complete.\n');
@@ -790,7 +862,7 @@ NPM:
 }
 
 function parseOptions(args) {
-  const options = { demo: args.includes('--demo'), snapshot: args.includes('--snapshot'), dataDir: null };
+  const options = { demo: args.includes('--demo'), snapshot: args.includes('--snapshot'), fresh: args.includes('--fresh'), dataDir: null };
   const dataDirIndex = args.indexOf('--data-dir');
   if (dataDirIndex >= 0) options.dataDir = args[dataDirIndex + 1];
   return options;

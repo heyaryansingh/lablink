@@ -22,7 +22,7 @@
     "build": "node bin/lablink.mjs build",
     "dev": "node bin/lablink.mjs demo",
     "demo": "node bin/lablink.mjs demo",
-    "smoke": "node bin/lablink.mjs demo --snapshot",
+    "smoke": "node bin/lablink.mjs demo --snapshot --fresh",
     "init": "node bin/lablink.mjs init",
     "seed": "node bin/lablink.mjs seed",
     "sync": "node bin/lablink.mjs sync",

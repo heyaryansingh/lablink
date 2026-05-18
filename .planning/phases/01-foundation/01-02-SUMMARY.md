@@ -32,12 +32,15 @@ The bootstrap runtime includes:
   - `lablink ai list`
   - `lablink ai approve <id>`
   - `lablink ai reject <id>`
+- Interactive TUI actions:
+  - Today: `j/k` select, `x` mark done, `s` snooze one day.
+  - AI Review: `j/k` select, `a` approve, `r` reject.
 
 ## Verification
 
 - `npm.cmd install` passed.
 - `node --check bin/lablink.mjs` passed.
-- `npm.cmd run smoke` passed.
+- `npm.cmd run smoke` passed with `--fresh` deterministic demo state.
 - `npm.cmd run test` passed.
 - `npm.cmd run build` passed.
 - `npm.cmd run validate` passed.
@@ -48,6 +51,7 @@ The bootstrap runtime includes:
 - Improved task row layout after the first smoke output truncated project context poorly.
 - Tightened transcript extraction after it split honorifics such as `Dr. Park` into bad suggestion titles.
 - Added tests to prevent broken honorific extraction from returning.
+- Made smoke deterministic by reseeding demo data for the smoke path.
 
 ## Next
 
