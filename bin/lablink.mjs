@@ -590,7 +590,7 @@ function renderProjects(store, width, useColor, state = {}) {
 }
 
 function renderMeetings(store, width, useColor, state = {}) {
-  const lines = [section('Meeting Intelligence', useColor), color('Zoom transcripts, imported notes, AI decisions, tasks, risks, and follow-ups.', ansi.gray, useColor), ''];
+  const lines = [section('Meeting Intelligence', useColor), color('Zoom transcripts, imported notes, review suggestions, tasks, risks, and follow-ups.', ansi.gray, useColor), ''];
   const selected = currentSelection(state, 'meetings');
   const rows = [
     ...store.meetings.map((meeting) => ({ kind: 'meeting', item: meeting })),
@@ -708,7 +708,7 @@ function renderPalette(width, useColor) {
 
 function statusBar(width, active, useColor, message = '') {
   const left = ` ${viewLabels[active] || active}`;
-  const right = message ? ` ${truncate(message, 42)} ` : '1-6 nav  arrows move  / search  ? palette  q quit ';
+  const right = message ? ` ${truncate(message, 42)} ` : '1-6 nav  arrows  / search  ? palette  q quit ';
   return color(left, ansi.green, useColor) + color(pad('', Math.max(1, width - left.length - right.length)), ansi.gray, useColor) + color(right, message ? ansi.yellow : ansi.gray, useColor);
 }
 
@@ -1610,7 +1610,7 @@ function runTests() {
   const snapshot = render(context.store, { view: 'command' }, { width: 118, height: 34, color: false });
   assert(snapshot.includes('Command Center'), 'snapshot includes Command Center');
   assert(snapshot.includes('Tau Pathology Study'), 'snapshot includes demo project');
-  assert(snapshot.includes('arrows move'), 'snapshot includes keyboard guidance');
+  assert(snapshot.includes('arrows'), 'snapshot includes keyboard guidance');
   assert(cycleView('command', 1) === 'today', 'view cycling works');
   assert(selectionCount(context.store, 'today') > 0, 'today list is selectable');
   assert(context.store.providers.every((provider) => ['openai', 'anthropic', 'local', 'custom'].includes(provider.id)), 'only real AI provider slots are registered');
@@ -1727,7 +1727,7 @@ async function main() {
     process.stdout.write(`Imported ${result.artifact.source}; created ${result.suggestions.length} AI review suggestions.\n`);
     return;
   }
-  if (command === 'ai') return handleAiCommand(args, options);
+  if (command === 'ai' && args.length > 1 && !options.snapshot) return handleAiCommand(args, options);
   if (command === 'schedule') return handleScheduleCommand(args, options);
   if (command === 'automation') return handleAutomationCommand(args, options);
   if (command === 'sync') {
@@ -1738,8 +1738,16 @@ async function main() {
     return;
   }
 
-  const view = command === 'today' ? 'today' : 'command';
-  const context = loadStore({ ...options, demo: command === 'demo' || options.demo });
+  const viewByCommand = {
+    today: 'today',
+    projects: 'projects',
+    meetings: 'meetings',
+    ai: 'ai',
+    settings: 'settings',
+  };
+  const view = viewByCommand[command] || 'command';
+  const demoLikeCommand = command === 'demo' || Boolean(viewByCommand[command]);
+  const context = loadStore({ ...options, demo: demoLikeCommand || options.demo || options.fresh });
   if (options.snapshot || !process.stdin.isTTY) {
     process.stdout.write(`${render(context.store, { view }, { width: 118, height: 34, color: false })}\n`);
     return;
