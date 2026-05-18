@@ -26,10 +26,11 @@
 **Plans:**
 
 - 01-01: Planning, repository setup, npm project, TypeScript tooling, CI skeleton.
-- 01-02: Config, theme, terminal utilities, extension registry, feature flags.
-- 01-03: CLI entry point, Ink app shell, navigation skeleton, demo mode.
+- 01-02: Launchable zero-dependency bootstrap runtime and npm validation.
+- 01-03: Config, theme, terminal utilities, extension registry, feature flags.
+- 01-04: CLI entry point, Ink app shell, navigation skeleton, demo mode.
 
-**Verification:** `npm run typecheck`, `npm run test`, `npm run build`, and `npm run demo` where dependencies are available.
+**Verification:** `npm run smoke`, `npm run test`, `npm run build`, `npm run validate`, and full TypeScript validation where rich dependencies are available.
 
 ## Phase 2: Data Core
 

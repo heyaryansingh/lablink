@@ -3,8 +3,8 @@
 ## Current Position
 
 - Date: 2026-05-18 America/Chicago
-- Phase: 0 - Product Definition
-- Plan: 00-01
+- Phase: 1 - Foundation
+- Plan: 01-02
 - Status: Verify
 - Repository: standalone git repo initialized in `C:\Aryan\GitHub Projects\lablink`
 - Remote: `origin` configured as `https://github.com/heyaryansingh/lablink.git`
@@ -19,6 +19,7 @@
 - Lab modules are feature flagged and extension-ready.
 - Local single-user is the first runtime, with server-ready boundaries.
 - PRD v2 is the active build-grade specification: `docs/product/PRD_V2.md`.
+- PRD v2.1 launch spec is active for the npm-launch layer: `docs/product/PRD_V2_1_LAUNCH_SPEC.md`.
 - Capability gap tracking is active: `docs/product/CAPABILITY_GAP.md`.
 
 ## Ralph Loop Ledger
@@ -39,18 +40,16 @@ Completion promise:
 
 ## Current Risks
 
-- Shell network access is restricted or npm resolution is stalled: `npm.cmd install` timed out after 180s, and `npm.cmd install --package-lock-only --ignore-scripts` timed out after 90s.
-- One leftover `node.exe` process from npm could not be stopped due Windows process permissions.
-- Because dependencies did not install, TypeScript, Vitest, and tsup validation could not run yet.
+- Rich dependency installation was blocked earlier, so the launch path now uses a zero-dependency Node runtime.
+- Full TypeScript/Ink validation remains pending until rich dependencies are intentionally installed.
 - `git push -u origin main` failed because github.com:443 is unreachable from this sandbox.
 - The PRD examples include mojibake-rendered Unicode from PowerShell; implementation must use clean source strings and ASCII fallbacks.
 - OAuth credentials for Microsoft, Google, and Zoom are user/institution-specific; implementation can provide flows and config but cannot complete live authorization without credentials.
 
 ## Next Actions
 
-- Commit product-definition checkpoint.
-- Resume Phase 1 as "Validated Foundation": resolve npm install/network issue and generate `package-lock.json`.
-- Run `npm.cmd run typecheck`, `npm.cmd run test`, and `npm.cmd run build`.
-- Fix validation failures before adding more surface area.
-- Implement the P0 path from `docs/product/CAPABILITY_GAP.md`: demo launch, v2 data tables, meeting import, AI review queue.
+- Commit launchable bootstrap runtime checkpoint.
+- Add richer review UI actions for approve/edit/reject inside the TUI.
+- Add v2 persistence bridge for meeting artifacts, AI suggestions, and audit.
+- Add project analytics and real task actions.
 - Attempt `git push -u origin main` when network/authentication allows it.

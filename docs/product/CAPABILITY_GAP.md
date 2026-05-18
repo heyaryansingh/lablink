@@ -2,7 +2,7 @@
 
 **Date:** May 18, 2026  
 **Compared against:** `LABLINK_PRD.md` v1 and `docs/product/PRD_V2.md`  
-**Current code baseline:** local commits through `e173b5e`.
+**Current code baseline:** launchable bootstrap runtime layer in progress after `9d18ed8`.
 
 ## Status Key
 
@@ -17,12 +17,13 @@
 | --- | --- | --- |
 | GSD planning | Built | Project memory, roadmap, state, Ralph loop ledger, phase summary exist. |
 | Standalone git repo | Built | Local repo initialized with GitHub remote. Push blocked by network. |
-| npm/TS/Ink scaffold | Partial | Source exists. Dependency install is blocked, so build not validated. |
+| npm launch path | Built | Zero-dependency bootstrap runtime validates with npm scripts. |
+| TS/Ink scaffold | Partial | Source exists as full architecture track. Rich dependency install is no longer required for launch. |
 | Config system | Partial | Defaults and TOML loader exist. Init wizard not built. |
 | Feature flags/extensions | Partial | Registry and built-in manifests exist. Runtime UI contributions not yet active. |
 | SQLite schema | Partial | Broad schema and migration exist. More v2 tables needed. |
 | Seed data | Partial | Realistic first seed exists. Needs richer demo story and idempotent test coverage. |
-| TUI shell | Partial | Sidebar/content/status/views exist. Needs validation, navigation depth, and polish. |
+| TUI shell | Partial | Bootstrap TUI has Command Center, Today, Projects, Meetings, AI Review, Settings, search, and command palette. Needs deeper interactions. |
 | AI provider abstraction | Partial | Anthropic/OpenAI/local/mock providers exist. Needs schemas, audit, capability detection, review queue. |
 | OAuth adapters | Partial | Microsoft, Google, Zoom flows exist. Need refresh, status, tests, and credentialed validation. |
 | Sync daemon | Partial | One-cycle inbox import exists. Needs cursors, retries, metrics, and provider status. |
@@ -61,8 +62,8 @@
 
 | Priority | Capability | Required Next Work |
 | --- | --- | --- |
-| P0 | Validated npm install/build/test | Resolve network/install, generate lockfile, fix TypeScript. |
-| P0 | Demo launch | Ensure `npm run demo` opens TUI with seed data. |
+| P0 | Validated npm install/build/test | Built for bootstrap runtime. Full TS/Ink validation remains later. |
+| P0 | Demo launch | Built for bootstrap runtime. |
 | P0 | Meeting import pipeline | Add artifact tables, transcript normalizer, processor, review queue. |
 | P0 | AI suggestion review | Add `ai_suggestions`, approval flows, provenance, UI. |
 | P0 | Design robustness | Add reusable table/list/panel components with width-safe truncation. |
@@ -79,8 +80,8 @@
 
 Do not build broad UI polish next. First make the product foundation executable:
 
-1. Resolve dependency install.
-2. Make demo launch.
-3. Add v2 data tables for meeting artifacts, AI suggestions, and audit.
-4. Build transcript import -> AI review queue -> approve tasks/decisions.
-5. Then refine UI with real workflows instead of placeholders.
+1. Preserve the zero-dependency launch path as a permanent fallback.
+2. Add v2 persistence tables or import/export bridge for meeting artifacts, AI suggestions, and audit.
+3. Deepen transcript import -> AI review queue -> approve tasks/decisions in the full data layer.
+4. Add real task actions and project analytics.
+5. Then migrate richer views onto the TypeScript/Ink runtime when dependencies are available.

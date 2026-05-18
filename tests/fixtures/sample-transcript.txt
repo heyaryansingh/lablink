@@ -1,0 +1,5 @@
+Dr. Park: The AT8 antibody is still backordered, which is a risk for Tau Pathology staining.
+Jordan: I will confirm an alternate AT8 vendor by Wednesday.
+Alex: Decision: we will use cohort 2 imaging data for the R01 figure draft.
+Sam: The CRISPR library QC is delayed and may block Friday's analysis handoff.
+Dr. Park: Please send a follow-up to Dr. Chen about the imaging pipeline collaboration.

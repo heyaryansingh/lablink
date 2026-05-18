@@ -10,6 +10,8 @@ This repository is in Phase 1 foundation work. The app is being built in GSD lay
 
 ```bash
 npm install
+npm run smoke
+npm run validate
 npm run dev
 npm run demo
 npm run typecheck
@@ -20,6 +22,20 @@ npm run build
 On Windows PowerShell systems that block `npm.ps1`, use `npm.cmd` instead.
 
 By default, development data uses `.lablink-dev` when `LABLINK_DATA_DIR` is set. Production defaults to `~/.lablink`.
+
+## Launch Runtime
+
+Lab Link currently ships a zero-dependency bootstrap runtime at `bin/lablink.mjs`. This is the launchable product surface used by npm scripts while the richer TypeScript/Ink runtime matures.
+
+```bash
+npm run demo                # interactive TUI
+npm run smoke               # deterministic dashboard snapshot
+node bin/lablink.mjs meeting import tests/fixtures/sample-transcript.txt
+node bin/lablink.mjs ai list
+node bin/lablink.mjs ai approve sug-risk-at8
+```
+
+The bootstrap runtime includes Command Center, Today, Projects, Meetings, AI Review, Settings, transcript import, deterministic local AI suggestions, and AI suggestion approve/reject commands.
 
 ## Architecture
 

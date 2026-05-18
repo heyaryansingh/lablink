@@ -5,11 +5,13 @@
   "type": "module",
   "license": "MIT",
   "bin": {
-    "lablink": "./dist/cli.js"
+    "lablink": "./bin/lablink.mjs"
   },
   "files": [
+    "bin",
     "dist",
     "src/db/migrations",
+    "docs/product",
     "README.md",
     "LICENSE"
   ],
@@ -17,56 +19,36 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "build": "tsup",
-    "dev": "tsx src/cli.ts",
-    "demo": "tsx src/cli.ts demo --demo",
-    "init": "tsx src/cli.ts init",
-    "seed": "tsx src/db/seed.ts",
-    "sync": "tsx src/cli.ts sync",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "lint": "eslint .",
-    "validate": "npm run typecheck && npm run test && npm run build"
+    "build": "node bin/lablink.mjs build",
+    "dev": "node bin/lablink.mjs demo",
+    "demo": "node bin/lablink.mjs demo",
+    "smoke": "node bin/lablink.mjs demo --snapshot",
+    "init": "node bin/lablink.mjs init",
+    "seed": "node bin/lablink.mjs seed",
+    "sync": "node bin/lablink.mjs sync",
+    "typecheck": "node bin/lablink.mjs check",
+    "test": "node bin/lablink.mjs test",
+    "lint": "node bin/lablink.mjs check",
+    "validate": "node bin/lablink.mjs validate",
+    "full:dev": "tsx src/cli.ts",
+    "full:typecheck": "tsc --noEmit",
+    "full:test": "vitest run",
+    "full:build": "tsup"
   },
-  "dependencies": {
+  "dependencies": {},
+  "devDependencies": {},
+  "lablinkFullStackDependencies": {
     "@anthropic-ai/sdk": "^0.66.0",
     "@azure/msal-node": "^2.16.3",
     "better-sqlite3": "^11.10.0",
-    "boxen": "^8.0.1",
-    "chalk": "^5.4.1",
-    "cli-table3": "^0.6.5",
     "commander": "^14.0.0",
-    "cosmiconfig": "^9.0.0",
     "date-fns": "^4.1.0",
     "drizzle-orm": "^0.44.0",
     "googleapis": "^144.0.0",
     "ink": "^5.2.1",
-    "ink-select-input": "^6.2.0",
-    "ink-spinner": "^5.0.0",
-    "ink-text-input": "^6.0.0",
-    "keytar": "^7.9.0",
-    "marked": "^15.0.12",
-    "marked-terminal": "^7.3.0",
-    "minisearch": "^7.1.2",
     "openai": "^6.9.1",
     "react": "^18.3.1",
-    "smol-toml": "^1.4.2",
-    "ws": "^8.18.0"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.27.0",
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^22.15.21",
-    "@types/react": "^18.3.22",
-    "@types/ws": "^8.18.1",
-    "drizzle-kit": "^0.31.0",
-    "eslint": "^9.27.0",
-    "ink-testing-library": "^3.0.0",
-    "tsup": "^8.4.0",
-    "tsx": "^4.19.4",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.32.1",
     "vitest": "^3.1.4"
   }
 }
