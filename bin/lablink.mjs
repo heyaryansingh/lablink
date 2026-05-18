@@ -5,7 +5,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 
-const VERSION = '0.1.0-beta.1';
+const VERSION = '0.1.0-beta.2';
 const APP_NAME = 'Lab Link';
 const SCHEMA_VERSION = 1;
 const DEFAULT_NOW = process.env.LABLINK_NOW || new Date().toISOString();
@@ -1068,6 +1068,7 @@ function printHelp() {
 
 Usage:
   lablink [demo] [--snapshot]
+  lablink smoke
   lablink init
   lablink today [--snapshot]
   lablink meeting import <file>
@@ -1077,6 +1078,7 @@ Usage:
   lablink sync
   lablink config
   lablink doctor
+  lablink --version
 
 NPM:
   npm run demo
@@ -1099,10 +1101,19 @@ function main() {
   const command = args[0] || 'demo';
   const options = parseOptions(args);
   if (command === '--help' || command === '-h' || command === 'help') return printHelp();
+  if (command === '--version' || command === '-v' || command === 'version') {
+    process.stdout.write(`${VERSION}\n`);
+    return;
+  }
   if (command === 'build') return build();
   if (command === 'check' || command === 'doctor') return check();
   if (command === 'test') return runTests();
   if (command === 'validate') return validate();
+  if (command === 'smoke') {
+    const context = loadStore({ ...options, demo: true, fresh: true });
+    process.stdout.write(`${render(context.store, { view: 'command' }, { width: 118, height: 34, color: false })}\n`);
+    return;
+  }
   if (command === 'config') {
     const context = loadStore(options);
     process.stdout.write(`${context.file}\n`);

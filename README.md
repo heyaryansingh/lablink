@@ -7,6 +7,23 @@ Current release line: beta prerelease. Core workflows are usable, but the produc
 Package name: `lablink-cli`
 CLI command: `lablink`
 
+## Try The Beta
+
+Requires Node.js 20 or newer.
+
+```bash
+npx lablink-cli@beta smoke
+npx lablink-cli@beta demo
+```
+
+Or install it globally:
+
+```bash
+npm install -g lablink-cli@beta
+lablink --version
+lablink demo
+```
+
 ## Current State
 
 This repository is in Phase 1 foundation work and is being prepared for beta npm publication.
@@ -16,6 +33,7 @@ This repository is in Phase 1 foundation work and is being prepared for beta npm
 ```bash
 npm install
 npm run pack:dry
+npm run release:check
 npm run smoke
 npm run validate
 npm run dev
@@ -43,17 +61,10 @@ node bin/lablink.mjs ai approve sug-risk-at8
 
 The bootstrap runtime includes Command Center, Today, Projects, Meetings, AI Review, Settings, transcript import, deterministic local AI suggestions, and AI suggestion approve/reject commands.
 
-Beta publish command:
+Run the full package release check before publishing:
 
 ```bash
-npm run publish:beta
-```
-
-Install from npm:
-
-```bash
-npm install -g lablink-cli@beta
-lablink demo
+npm run release:check
 ```
 
 Run locally:
@@ -71,6 +82,7 @@ npm run smoke
 Publish beta:
 
 ```bash
+npm login
 npm run publish:beta
 ```
 
