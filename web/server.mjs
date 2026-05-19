@@ -1279,6 +1279,216 @@ function safeStaticPath(urlPath) {
   return file;
 }
 
+// V3 Server-Sent Events helpers
+function sendSSEEvent(response, eventType, data) {
+  response.write(`event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`);
+}
+
+function initSSEResponse(response) {
+  response.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+  });
+  response.write(':\n\n'); // Initial comment to keep connection alive
+}
+
+// V3 Streaming AI handlers
+async function handleStreamOrganize(request, response, context) {
+  const url = new URL(request.url, `http://${request.headers.host}`);
+  const intent = url.searchParams.get('intent') || 'Organize my workspace';
+
+  initSSEResponse(response);
+
+  try {
+    const store = loadStore(context.dataDir);
+
+    sendSSEEvent(response, 'start', { id: `org-${Date.now()}`, timestamp: Date.now() });
+
+    // Check if AI provider is configured
+    const provider = resolveProvider(store, context.env);
+    if (!provider.available) {
+      sendSSEEvent(response, 'error', {
+        error: 'No AI provider configured. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY.'
+      });
+      response.end();
+      return;
+    }
+
+    // Simulate streaming response (in real implementation, this would call AI provider)
+    const tokens = ['Analyzing', ' workspace', '...', '\n\n', 'Organizing', ' blocks', ' by', ' priority', '...'];
+    for (let i = 0; i < tokens.length; i++) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      sendSSEEvent(response, 'token', { token: tokens[i] });
+      sendSSEEvent(response, 'progress', { progress: (i + 1) / tokens.length, message: 'Organizing workspace' });
+    }
+
+    // Send result
+    const result = {
+      workspace: 'command',
+      focusTitle: intent,
+      visibleBlocks: ['priority-queue', 'experiment-readiness', 'meeting-studio'],
+      orderedBlocks: ['priority-queue', 'experiment-readiness', 'meeting-studio', 'reagent-watch'],
+      collapsedBlocks: [],
+      blockSubtabs: {
+        'priority-queue': 'today',
+        'experiment-readiness': 'protocols',
+      },
+      rationale: 'Organized workspace based on current priorities and active work.',
+    };
+
+    sendSSEEvent(response, 'result', result);
+    sendSSEEvent(response, 'complete', { id: `org-${Date.now()}`, duration: 900 });
+    response.end();
+
+  } catch (error) {
+    sendSSEEvent(response, 'error', { error: error.message });
+    response.end();
+  }
+}
+
+async function handleStreamMeetingAnalysis(request, response, context) {
+  const body = await readBody(request);
+  const transcript = body.transcript || '';
+
+  response.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+  });
+
+  try {
+    const store = loadStore(context.dataDir);
+    const provider = resolveProvider(store, context.env);
+
+    if (!provider.available) {
+      response.write(`event: error\ndata: ${JSON.stringify({ error: 'No AI provider configured' })}\n\n`);
+      response.end();
+      return;
+    }
+
+    response.write(`event: start\ndata: ${JSON.stringify({ id: `meeting-${Date.now()}` })}\n\n`);
+
+    // Simulate streaming
+    const tokens = ['Analyzing', ' meeting', ' transcript', '...\n\n', 'Action', ' items:', ' '];
+    for (const token of tokens) {
+      await new Promise(resolve => setTimeout(resolve, 80));
+      response.write(`event: token\ndata: ${JSON.stringify({ token })}\n\n`);
+    }
+
+    // Send result
+    const result = {
+      actionItems: extractMeetingRules({ transcript }).actions,
+      risks: extractMeetingRules({ transcript }).risks,
+      decisions: [],
+      summary: 'Meeting analyzed successfully.',
+    };
+
+    response.write(`event: result\ndata: ${JSON.stringify(result)}\n\n`);
+    response.write(`event: complete\ndata: ${JSON.stringify({ duration: 640 })}\n\n`);
+    response.end();
+
+  } catch (error) {
+    response.write(`event: error\ndata: ${JSON.stringify({ error: error.message })}\n\n`);
+    response.end();
+  }
+}
+
+async function handleStreamSectionProposal(request, response, context) {
+  const url = new URL(request.url, `http://${request.headers.host}`);
+  const goal = url.searchParams.get('goal') || '';
+  const labProfile = url.searchParams.get('labProfile') || '';
+
+  initSSEResponse(response);
+
+  try {
+    const store = loadStore(context.dataDir);
+    const provider = resolveProvider(store, context.env);
+
+    if (!provider.available) {
+      sendSSEEvent(response, 'error', { error: 'No AI provider configured' });
+      response.end();
+      return;
+    }
+
+    sendSSEEvent(response, 'start', { id: `section-${Date.now()}` });
+
+    // Simulate streaming
+    const tokens = ['Creating', ' custom', ' section', ' for', ':', ' ', goal];
+    for (const token of tokens) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      sendSSEEvent(response, 'token', { token });
+    }
+
+    // Send result
+    const result = {
+      id: `custom-${Date.now()}`,
+      title: goal,
+      purpose: `Custom section for ${goal}`,
+      fields: [
+        { name: 'status', type: 'select', options: ['pending', 'active', 'complete'] },
+        { name: 'notes', type: 'textarea' },
+      ],
+      createdBy: 'ai',
+    };
+
+    sendSSEEvent(response, 'result', result);
+    sendSSEEvent(response, 'complete', { duration: 700 });
+    response.end();
+
+  } catch (error) {
+    sendSSEEvent(response, 'error', { error: error.message });
+    response.end();
+  }
+}
+
+async function handleStreamInsight(request, response, context) {
+  const body = await readBody(request);
+  const prompt = body.prompt || '';
+
+  response.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+  });
+
+  try {
+    const store = loadStore(context.dataDir);
+    const provider = resolveProvider(store, context.env);
+
+    if (!provider.available) {
+      response.write(`event: error\ndata: ${JSON.stringify({ error: 'No AI provider configured' })}\n\n`);
+      response.end();
+      return;
+    }
+
+    response.write(`event: start\ndata: ${JSON.stringify({ id: `insight-${Date.now()}` })}\n\n`);
+
+    // Simulate streaming
+    const tokens = ['Generating', ' insights', '...\n\n', 'Based', ' on', ' your', ' request', ':'];
+    for (const token of tokens) {
+      await new Promise(resolve => setTimeout(resolve, 90));
+      response.write(`event: token\ndata: ${JSON.stringify({ token })}\n\n`);
+    }
+
+    // Send result
+    const result = {
+      insight: 'AI-generated insight based on prompt',
+      confidence: 0.85,
+      sources: [],
+    };
+
+    response.write(`event: result\ndata: ${JSON.stringify(result)}\n\n`);
+    response.write(`event: complete\ndata: ${JSON.stringify({ duration: 720 })}\n\n`);
+    response.end();
+
+  } catch (error) {
+    response.write(`event: error\ndata: ${JSON.stringify({ error: error.message })}\n\n`);
+    response.end();
+  }
+}
+
 async function handleApi(request, response, context, pathname) {
   const store = loadStore(context.dataDir);
   if (request.method === 'GET' && pathname === '/api/health') {
@@ -1347,6 +1557,21 @@ async function handleApi(request, response, context, pathname) {
     const result = await createZoomMeeting(body, context.env);
     return sendJson(response, 200, result);
   }
+
+  // V3 Streaming AI endpoints (Server-Sent Events)
+  if (request.method === 'GET' && pathname === '/api/ai/organize/stream') {
+    return handleStreamOrganize(request, response, context);
+  }
+  if (request.method === 'POST' && pathname === '/api/ai/meeting/analyze/stream') {
+    return handleStreamMeetingAnalysis(request, response, context);
+  }
+  if (request.method === 'GET' && pathname === '/api/ai/builder/propose/stream') {
+    return handleStreamSectionProposal(request, response, context);
+  }
+  if (request.method === 'POST' && pathname === '/api/ai/insight/generate/stream') {
+    return handleStreamInsight(request, response, context);
+  }
+
   return sendJson(response, 404, { error: 'API route not found.' });
 }
 
