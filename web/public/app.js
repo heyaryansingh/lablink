@@ -2,11 +2,12 @@ const STORAGE_KEY = 'lablink.web.v2.4';
 
 const TABS = [
   { id: 'command', label: 'Command', key: '1' },
-  { id: 'projects', label: 'Projects', key: '2' },
-  { id: 'meetings', label: 'Meeting Studio', key: '3' },
-  { id: 'ai', label: 'AI Review', key: '4' },
-  { id: 'integrations', label: 'Integrations', key: '5' },
-  { id: 'settings', label: 'Settings', key: '6' },
+  { id: 'meetings', label: 'Meeting Studio', key: '2' },
+  { id: 'builder', label: 'Lab Builder', key: '3' },
+  { id: 'projects', label: 'Projects', key: '4' },
+  { id: 'ai', label: 'AI Review', key: '5' },
+  { id: 'integrations', label: 'Integrations', key: '6' },
+  { id: 'settings', label: 'Settings', key: '7' },
 ];
 
 const DEFAULT_AGENDA = [
@@ -30,7 +31,16 @@ const state = {
   tabOrder: TABS.map((tab) => tab.id),
   density: 'compact',
   railFocus: 'operations',
+  showIntel: false,
   visibleModules: {},
+  builder: {
+    goal: 'Create a section that helps our lab track experiment readiness, blockers, owners, and next actions across meetings and messages.',
+    labProfile: 'Wet lab with imaging, animal work, grants, reagents, shared equipment, and weekly lab meetings.',
+    proposal: null,
+    busy: null,
+    manualTitle: 'Protocol Readiness',
+    manualPurpose: 'Track protocols, missing approvals, sample readiness, and owners before an experiment starts.',
+  },
   meeting: {
     title: 'Weekly Lab Meeting',
     agenda: DEFAULT_AGENDA,
@@ -56,6 +66,7 @@ function loadPrefs() {
     if (prefs.activeTab) state.activeTab = prefs.activeTab;
     if (prefs.density) state.density = prefs.density;
     if (prefs.railFocus) state.railFocus = prefs.railFocus;
+    if (typeof prefs.showIntel === 'boolean') state.showIntel = prefs.showIntel;
     if (prefs.visibleModules) state.visibleModules = prefs.visibleModules;
   } catch {
     localStorage.removeItem(STORAGE_KEY);
@@ -68,6 +79,7 @@ function savePrefs() {
     activeTab: state.activeTab,
     density: state.density,
     railFocus: state.railFocus,
+    showIntel: state.showIntel,
     visibleModules: state.visibleModules,
   }));
 }
@@ -173,7 +185,7 @@ function render() {
 
   app.innerHTML = `
     ${renderTopbar()}
-    <div class="workspace">
+    <div class="workspace ${state.showIntel ? '' : 'no-intel'}">
       <aside class="rail"><div class="rail-scroll">${renderRail()}</div></aside>
       <main class="main"><div class="main-scroll">${renderMain()}</div></main>
       <aside class="intel-rail"><div class="intel-scroll">${renderIntelRail()}</div></aside>
@@ -191,7 +203,8 @@ function renderTopbar() {
       </div>
       <div class="topbar-actions">
         <button class="button ghost" type="button" data-action="refresh">Refresh</button>
-        <button class="button secondary" type="button" data-tab="integrations">${plural(configuredIntegrations(), 'integration')} ready</button>
+        <button class="button ghost" type="button" data-action="toggle-intel">${state.showIntel ? 'Hide Context' : 'Show Context'}</button>
+        <button class="button secondary" type="button" data-tab="builder">Build Section</button>
         <button class="button primary" type="button" data-tab="meetings">${plural(counts.meetings, 'meeting')}</button>
       </div>
     </header>`;
@@ -218,7 +231,7 @@ function renderRail() {
       </div>
     </section>
     <section class="rail-section">
-      <div class="rail-section-title">Focus</div>
+      <div class="rail-section-title">Workspace</div>
       <div class="segmented">
         ${['operations', 'meetings', 'integrations'].map((mode) => `
           <button class="button compact ${state.railFocus === mode ? 'secondary' : 'ghost'}" type="button" data-action="rail-focus" data-mode="${mode}">${mode}</button>
@@ -226,14 +239,14 @@ function renderRail() {
       </div>
     </section>
     <section class="rail-section">
-      <div class="rail-section-title">Lab Modules</div>
-      <div class="switch-list">
-        ${Object.entries(state.visibleModules).slice(0, 10).map(([key, enabled]) => `
-          <label class="switch-item">
-            <input type="checkbox" data-feature="${escapeHtml(key)}" ${enabled ? 'checked' : ''}>
-            <span class="truncate">${escapeHtml(key)}</span>
-          </label>
-        `).join('')}
+      <div class="rail-section-title">Controls</div>
+      <div class="status-list">
+        <button class="status-item as-button" type="button" data-action="toggle-intel">
+          <span>Context rail</span><span class="pill ${state.showIntel ? 'ok' : ''}">${state.showIntel ? 'shown' : 'hidden'}</span>
+        </button>
+        <button class="status-item as-button" type="button" data-action="density-toggle">
+          <span>Density</span><span class="pill">${escapeHtml(state.density)}</span>
+        </button>
       </div>
     </section>
     <section class="rail-section">
@@ -249,8 +262,9 @@ function renderRail() {
 function renderNavItem(tab) {
   const counts = {
     command: state.data.counts.openTasks,
-    projects: state.data.counts.projects,
     meetings: state.data.counts.meetings,
+    builder: state.data.customSections?.length || 0,
+    projects: state.data.counts.projects,
     ai: state.data.counts.pendingAi,
     integrations: configuredIntegrations(),
     settings: Object.keys(state.visibleModules).length,
@@ -280,8 +294,9 @@ function renderWorkspaceTab(tab) {
 }
 
 function renderActiveView() {
-  if (state.activeTab === 'projects') return renderProjects();
   if (state.activeTab === 'meetings') return renderMeetingStudio();
+  if (state.activeTab === 'builder') return renderLabBuilder();
+  if (state.activeTab === 'projects') return renderProjects();
   if (state.activeTab === 'ai') return renderAiReview();
   if (state.activeTab === 'integrations') return renderIntegrations();
   if (state.activeTab === 'settings') return renderSettings();
@@ -289,43 +304,61 @@ function renderActiveView() {
 }
 
 function renderCommand() {
+  const leadTask = state.data.tasks[0];
+  const nextMeeting = state.data.meetings.find((meeting) => meeting.status === 'scheduled') || state.data.meetings[0];
+  const customSections = state.data.customSections || [];
   return `
     <section class="view-header">
       <div>
         <div class="eyebrow">Command Center</div>
-        <h1>Daily lab operating picture</h1>
-        <p>Priority work, project pressure, meeting carryover, and review items from the local Lab Link graph.</p>
+        <h1>Today, without the noise</h1>
+        <p>A calmer operating layer: one focus, one meeting thread, visible risks, and custom lab sections you can evolve with AI.</p>
       </div>
       <div class="inline-actions">
-        <button class="button secondary" type="button" data-tab="meetings">Open Meeting Studio</button>
-        <button class="button" type="button" data-tab="ai">Review AI queue</button>
+        <button class="button secondary" type="button" data-tab="builder">Customize</button>
+        <button class="button primary" type="button" data-tab="meetings">Meeting Studio</button>
       </div>
     </section>
-    <section class="stat-grid">
-      <div class="stat"><div class="stat-value">${state.data.counts.openTasks}</div><div class="stat-label">Open tasks</div></div>
-      <div class="stat"><div class="stat-value">${state.data.counts.risks}</div><div class="stat-label">Active risks</div></div>
-      <div class="stat"><div class="stat-value">${state.data.counts.pendingAi}</div><div class="stat-label">Pending suggestions</div></div>
-      <div class="stat"><div class="stat-value">${configuredIntegrations()}</div><div class="stat-label">Configured surfaces</div></div>
+    <section class="focus-strip">
+      <article class="focus-card primary-focus">
+        <div class="eyebrow">Primary Focus</div>
+        <h2>${escapeHtml(leadTask?.title || 'No open task')}</h2>
+        <div class="meta">
+          <span class="pill ${statusClass(leadTask?.priority)}">${escapeHtml(leadTask?.priority || 'clear')}</span>
+          <span>${escapeHtml(leadTask?.project || 'No project')}</span>
+          <span>${escapeHtml(leadTask?.assignee || 'Unassigned')}</span>
+        </div>
+        <p class="muted">${escapeHtml(leadTask?.reason || 'The queue is clear.')}</p>
+      </article>
+      <article class="focus-card">
+        <div class="eyebrow">Next Meeting</div>
+        <h2>${escapeHtml(nextMeeting?.title || 'No meeting scheduled')}</h2>
+        <p class="muted">${escapeHtml(nextMeeting?.summary || 'No meeting context yet.')}</p>
+        <div class="meta"><span>${escapeHtml(formatTime(nextMeeting?.at))}</span><span class="pill ${statusClass(nextMeeting?.status)}">${escapeHtml(nextMeeting?.status || 'none')}</span></div>
+      </article>
+      <article class="focus-card">
+        <div class="eyebrow">System</div>
+        <h2>${state.data.counts.pendingAi} review items</h2>
+        <p class="muted">${configuredIntegrations()} configured integration surface${configuredIntegrations() === 1 ? '' : 's'}.</p>
+        <div class="meta"><button class="button compact" type="button" data-tab="ai">Review</button><button class="button compact" type="button" data-tab="integrations">Setup</button></div>
+      </article>
     </section>
-    <section class="grid two" style="margin-top: 12px;">
-      <div class="panel">
-        <div class="panel-header"><div><div class="eyebrow">Priority Queue</div><div class="panel-title">Next execution block</div></div></div>
-        <div class="item-list">${state.data.tasks.slice(0, 6).map(renderTask).join('')}</div>
+    <section class="grid two airy-grid">
+      <div class="panel quiet-panel">
+        <div class="panel-header"><div><div class="eyebrow">Priority Queue</div><div class="panel-title">Next four tasks</div></div></div>
+        <div class="item-list">${state.data.tasks.slice(0, 4).map(renderTask).join('')}</div>
       </div>
-      <div class="panel">
-        <div class="panel-header"><div><div class="eyebrow">Risk Radar</div><div class="panel-title">Operational blockers</div></div></div>
+      <div class="panel quiet-panel">
+        <div class="panel-header"><div><div class="eyebrow">Risk Radar</div><div class="panel-title">Only active blockers</div></div></div>
         <div class="item-list">${state.data.risks.map(renderRisk).join('')}</div>
       </div>
     </section>
-    <section class="grid two" style="margin-top: 12px;">
-      <div class="panel">
-        <div class="panel-header"><div><div class="eyebrow">Meetings</div><div class="panel-title">Context feed</div></div></div>
-        <div class="item-list">${state.data.meetings.map(renderMeetingRow).join('')}</div>
+    <section class="panel quiet-panel airy-grid">
+      <div class="panel-header">
+        <div><div class="eyebrow">Adaptive Lab Sections</div><div class="panel-title">Specialized surfaces for this lab</div></div>
+        <button class="button compact" type="button" data-tab="builder">Build more</button>
       </div>
-      <div class="panel">
-        <div class="panel-header"><div><div class="eyebrow">Inbox</div><div class="panel-title">Coordination signals</div></div></div>
-        <div class="item-list">${state.data.inbox.map(renderInbox).join('')}</div>
-      </div>
+      <div class="section-grid">${customSections.slice(0, 3).map(renderCustomSection).join('') || '<div class="muted">No custom sections yet.</div>'}</div>
     </section>`;
 }
 
@@ -505,6 +538,105 @@ function renderRulesBucket(label, items = []) {
     </div>`;
 }
 
+function renderLabBuilder() {
+  const provider = state.data.providers.find((item) => item.status === 'configured');
+  return `
+    <section class="view-header">
+      <div>
+        <div class="eyebrow">Lab Builder</div>
+        <h1>Make Lab Link evolve around your lab</h1>
+        <p>Ask a real AI provider to design new operating sections, then review and apply them into this local workspace.</p>
+      </div>
+      <div class="inline-actions">
+        <span class="pill ${provider ? 'configured' : ''}">${provider ? `AI: ${escapeHtml(provider.label)}` : 'AI setup required'}</span>
+      </div>
+    </section>
+    <section class="builder-layout">
+      <div class="tool builder-tool">
+        <div class="tool-header">
+          <div><div class="eyebrow">AI Composer</div><h3>Design a section</h3></div>
+          <button class="button primary" type="button" data-action="propose-section" ${state.builder.busy ? 'disabled' : ''}>Generate With Real AI</button>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="builder-goal">What should Lab Link manage?</label>
+            <textarea id="builder-goal">${escapeHtml(state.builder.goal)}</textarea>
+          </div>
+          <div class="field">
+            <label for="builder-profile">Lab profile and constraints</label>
+            <textarea id="builder-profile">${escapeHtml(state.builder.labProfile)}</textarea>
+          </div>
+          <div class="meta">
+            <span class="pill">${state.builder.busy ? escapeHtml(state.builder.busy) : 'ready'}</span>
+            <span class="muted">Provider output is reviewed before it becomes part of the workspace.</span>
+          </div>
+        </div>
+      </div>
+      <div class="tool builder-tool">
+        <div class="tool-header">
+          <div><div class="eyebrow">Proposal</div><h3>Review before applying</h3></div>
+          <button class="button secondary" type="button" data-action="apply-proposal" ${!state.builder.proposal || state.builder.busy ? 'disabled' : ''}>Apply Section</button>
+        </div>
+        ${state.builder.proposal ? renderCustomSection(state.builder.proposal, { preview: true }) : '<div class="output muted">No AI proposal yet. Generate a section with a configured provider.</div>'}
+      </div>
+    </section>
+    <section class="grid two airy-grid">
+      <div class="panel quiet-panel">
+        <div class="panel-header"><div><div class="eyebrow">Manual Section</div><div class="panel-title">Fast local customization</div></div></div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="manual-title">Section name</label>
+            <input id="manual-title" value="${escapeHtml(state.builder.manualTitle)}">
+          </div>
+          <div class="field">
+            <label for="manual-purpose">Purpose</label>
+            <textarea id="manual-purpose">${escapeHtml(state.builder.manualPurpose)}</textarea>
+          </div>
+          <button class="button" type="button" data-action="save-manual-section">Save Manual Section</button>
+        </div>
+      </div>
+      <div class="panel quiet-panel">
+        <div class="panel-header"><div><div class="eyebrow">Design Choices</div><div class="panel-title">Why this is calmer</div></div></div>
+        <div class="item-list">
+          <div class="architecture-row"><strong>Focus first</strong><span>Command view now emphasizes a primary task, next meeting, and only active blockers.</span></div>
+          <div class="architecture-row"><strong>Optional context</strong><span>The intelligence rail is hidden by default and can be toggled on when needed.</span></div>
+          <div class="architecture-row"><strong>Custom sections</strong><span>Each lab can add management surfaces without changing code or installing plugins.</span></div>
+          <div class="architecture-row"><strong>Real AI only</strong><span>AI composition fails honestly if the provider is unavailable.</span></div>
+        </div>
+      </div>
+    </section>
+    <section class="panel quiet-panel airy-grid">
+      <div class="panel-header"><div><div class="eyebrow">Installed Sections</div><div class="panel-title">Local workspace extensions</div></div></div>
+      <div class="section-grid">${(state.data.customSections || []).map((section) => renderCustomSection(section, { removable: true })).join('')}</div>
+    </section>`;
+}
+
+function renderCustomSection(section, options = {}) {
+  return `
+    <article class="section-card">
+      <div class="section-card-head">
+        <div>
+          <div class="eyebrow">${escapeHtml(section.module || 'custom')}</div>
+          <h3>${escapeHtml(section.title)}</h3>
+        </div>
+        <span class="pill">${escapeHtml(section.layout || 'brief')}</span>
+      </div>
+      <p class="muted">${escapeHtml(section.purpose)}</p>
+      <div class="field-list">
+        ${(section.fields || []).slice(0, 4).map((field) => `
+          <div class="mini-field"><span>${escapeHtml(field.label)}</span><strong>${escapeHtml(field.value || field.type)}</strong></div>
+        `).join('')}
+      </div>
+      ${(section.signals || []).length ? `<div class="section-subhead">Signals</div><ul>${section.signals.slice(0, 3).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
+      ${(section.actions || []).length ? `<div class="section-subhead">Actions</div><ul>${section.actions.slice(0, 3).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
+      <div class="meta">
+        ${(section.integrations || []).slice(0, 4).map((item) => `<span class="pill">${escapeHtml(item)}</span>`).join('')}
+      </div>
+      ${options.removable ? `<button class="button compact ghost" type="button" data-action="delete-section" data-section-id="${escapeHtml(section.id)}">Remove</button>` : ''}
+      ${options.preview ? `<div class="muted small">${escapeHtml(section.dataPolicy || '')}</div>` : ''}
+    </article>`;
+}
+
 function renderAiReview() {
   return `
     <section class="view-header">
@@ -552,12 +684,26 @@ function renderSuggestion(item) {
 }
 
 function renderIntegrations() {
+  const configured = state.data.integrations.filter((item) => ['configured', 'ready', 'oauth credentials present'].includes(item.status));
   return `
     <section class="view-header">
       <div>
         <div class="eyebrow">Integrations</div>
         <h1>Institution and lab coordination surfaces</h1>
-        <p>Readiness is based on configured credentials. The beta exposes what is real today and what still needs OAuth or an adapter.</p>
+        <p>Readiness is based on configured credentials. Setup stays visible so each lab can bring Outlook, Gmail, Slack, Notion, Zoom, and messaging online at its own pace.</p>
+      </div>
+      <div class="inline-actions"><span class="pill ${configured.length ? 'ok' : ''}">${configured.length} ready</span></div>
+    </section>
+    <section class="integration-summary">
+      <div>
+        <div class="eyebrow">Setup Path</div>
+        <h2>Connect one surface at a time</h2>
+      </div>
+      <div class="setup-steps">
+        <span>1. Credentials</span>
+        <span>2. Consent</span>
+        <span>3. Sync</span>
+        <span>4. Publish</span>
       </div>
     </section>
     <section class="grid two">
@@ -567,6 +713,7 @@ function renderIntegrations() {
             <div class="project-title">${escapeHtml(item.label)}</div>
             <div class="muted small">${escapeHtml(item.surface)}</div>
             <div class="meta">${(item.required || []).map((key) => `<span class="pill">${escapeHtml(key)}</span>`).join('')}</div>
+            ${(item.setup || []).length ? `<div class="setup-mini">${item.setup.map((step) => `<span>${escapeHtml(step)}</span>`).join('')}</div>` : ''}
             <p class="muted small">${escapeHtml(item.nextStep)}</p>
           </div>
           <span class="pill ${statusClass(item.status)}">${escapeHtml(item.status)}</span>
@@ -743,6 +890,93 @@ async function startZoom() {
   }
 }
 
+async function proposeSection() {
+  if (!state.builder.goal.trim()) {
+    state.toast = 'Describe the lab section you want AI to design.';
+    render();
+    return;
+  }
+  state.builder.busy = 'real ai';
+  state.builder.proposal = null;
+  render();
+  try {
+    const result = await api('/api/workspace/propose', {
+      method: 'POST',
+      body: JSON.stringify({
+        goal: state.builder.goal,
+        labProfile: state.builder.labProfile,
+      }),
+    });
+    state.builder.proposal = result.section;
+    state.toast = `AI proposed ${result.section.title}. Review before applying.`;
+  } catch (error) {
+    const required = error.payload?.required ? ` Required: ${error.payload.required.join(', ')}.` : '';
+    state.toast = `${error.message}${required}`;
+  } finally {
+    state.builder.busy = null;
+    render();
+  }
+}
+
+async function saveSection(section) {
+  state.builder.busy = 'saving';
+  render();
+  try {
+    const result = await api('/api/workspace/sections', {
+      method: 'POST',
+      body: JSON.stringify({ section }),
+    });
+    state.data = result.state;
+    state.toast = `Saved ${result.section.title}.`;
+  } catch (error) {
+    state.toast = `Could not save section: ${error.message}`;
+  } finally {
+    state.builder.busy = null;
+    render();
+  }
+}
+
+async function saveManualSection() {
+  const title = state.builder.manualTitle.trim();
+  if (!title) {
+    state.toast = 'Manual section name is required.';
+    render();
+    return;
+  }
+  await saveSection({
+    title,
+    module: 'manual_lab_ops',
+    purpose: state.builder.manualPurpose,
+    layout: 'checklist',
+    createdBy: 'manual',
+    fields: [
+      { label: 'Owner', type: 'person', value: state.data.user.name },
+      { label: 'Status', type: 'status', value: 'Needs setup' },
+    ],
+    signals: ['Manual section created locally.'],
+    actions: ['Define fields.', 'Connect relevant integrations.', 'Review in next lab meeting.'],
+    integrations: ['Notion', 'Slack', 'Zoom'],
+  });
+}
+
+async function deleteSection(id) {
+  state.builder.busy = 'removing';
+  render();
+  try {
+    const result = await api('/api/workspace/sections/delete', {
+      method: 'POST',
+      body: JSON.stringify({ id }),
+    });
+    state.data = result.state;
+    state.toast = result.deleted ? 'Section removed.' : 'Section was already removed.';
+  } catch (error) {
+    state.toast = `Could not remove section: ${error.message}`;
+  } finally {
+    state.builder.busy = null;
+    render();
+  }
+}
+
 function startLiveNotes() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
@@ -819,9 +1053,23 @@ function handleClick(event) {
     savePrefs();
     render();
   }
+  if (action === 'toggle-intel') {
+    state.showIntel = !state.showIntel;
+    savePrefs();
+    render();
+  }
+  if (action === 'density-toggle') {
+    state.density = state.density === 'compact' ? 'comfortable' : 'compact';
+    savePrefs();
+    render();
+  }
   if (action === 'run-rules') runRules();
   if (action === 'run-ai') runAiAnalysis();
   if (action === 'start-zoom') startZoom();
+  if (action === 'propose-section') proposeSection();
+  if (action === 'apply-proposal' && state.builder.proposal) saveSection(state.builder.proposal);
+  if (action === 'save-manual-section') saveManualSection();
+  if (action === 'delete-section') deleteSection(event.target.closest('[data-action]').dataset.sectionId);
   if (action === 'start-live') startLiveNotes();
   if (action === 'stop-live') stopLiveNotes();
   if (action === 'reset-tabs') {
@@ -835,6 +1083,7 @@ function handleClick(event) {
     state.activeTab = 'command';
     state.density = 'compact';
     state.railFocus = 'operations';
+    state.showIntel = false;
     state.visibleModules = { ...(state.data.featureFlags || {}) };
     render();
   }
@@ -851,6 +1100,18 @@ function handleInput(event) {
   if (event.target.id === 'meeting-transcript') {
     state.meeting.transcript = event.target.value;
     scheduleRules();
+  }
+  if (event.target.id === 'builder-goal') {
+    state.builder.goal = event.target.value;
+  }
+  if (event.target.id === 'builder-profile') {
+    state.builder.labProfile = event.target.value;
+  }
+  if (event.target.id === 'manual-title') {
+    state.builder.manualTitle = event.target.value;
+  }
+  if (event.target.id === 'manual-purpose') {
+    state.builder.manualPurpose = event.target.value;
   }
   if (event.target.id === 'density') {
     state.density = event.target.value;
@@ -915,4 +1176,3 @@ document.addEventListener('keydown', (event) => {
 });
 
 loadData();
-

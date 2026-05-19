@@ -60,9 +60,11 @@ Current web platform completion promise:
 - AI commands now require real OpenAI, Anthropic, local, or custom provider configuration; no-provider environments intentionally fail AI commands with setup instructions.
 - Website meeting analysis must keep the same policy: rules-based local extraction is allowed only when labeled, and real AI routes must fail without configured providers.
 - Zoom meeting creation must call a real configured Zoom token or fail with setup guidance; the web product must not invent meeting links.
+- The browser default should stay calm and customizable: optional context rail, focus-first command view, and Lab Builder for lab-specific sections.
+- Lab Builder may use AI to propose new sections only through a real configured provider; manual local sections remain available without AI.
 
 ## Next Actions
 
 - Start the local web server for browser review.
 - Publish the beta after a final `npm run release:check` in the release environment.
-- Continue OAuth-backed Microsoft/Google/Zoom setup flows, saved layout presets, and richer meeting-to-execution publishing.
+- Continue OAuth-backed Microsoft/Google/Zoom setup flows, AI-generated section editing, saved layout presets, and richer meeting-to-execution publishing.

@@ -10,6 +10,9 @@ Status: Complete
 - Added zero-dependency Node web server with static app serving and JSON APIs.
 - Added web routes for health, local state, integrations, rules-based meeting extraction, real-provider meeting analysis, and real Zoom meeting creation.
 - Added browser workspace with command rail, reorderable workspace tabs, intelligence rail, Meeting Studio, integration status, module toggles, density controls, and persisted browser preferences.
+- Refined the default website into a calmer workspace with the intelligence rail hidden by default, a focus-first Command view, and fewer always-visible panels.
+- Added Lab Builder for manually saved custom lab sections and real-provider AI section proposals.
+- Added custom section persistence routes for apply/delete workflows.
 - Added beta packaging coverage for the website and web smoke checks.
 
 ## Verification
@@ -17,6 +20,7 @@ Status: Complete
 - `node bin/lablink.mjs web --smoke` passed.
 - `npm run web:smoke` passed.
 - Local HTTP check passed for `/api/health` and `/`.
+- Local HTTP check passed for custom section save/delete.
 - `npm run validate` passed.
 - `npm run release:check` passed and validated installed package web smoke.
 
@@ -26,6 +30,7 @@ Status: Complete
 - Fake meeting joins remain disallowed.
 - Third-party meeting assistant products are product references only; source copying is out of scope.
 - The weakest issue found was duplicate direct-run execution when importing the web server from the CLI; it was fixed by checking the actual process entrypoint.
+- The second refinement removed visual crowding by making the context rail optional and moving lab customization into Lab Builder rather than overloading the command rail.
 
 ## Next
 

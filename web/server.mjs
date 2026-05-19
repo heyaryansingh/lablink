@@ -173,10 +173,16 @@ function normalizeStore(store) {
     'progressEvents',
     'aiRuns',
     'auditLog',
+    'customSections',
   ]) {
     if (!Array.isArray(store[key])) store[key] = defaults[key] || [];
   }
+  store.customSections = store.customSections.map((section) => sanitizeSection(section, section.createdBy || 'local'));
   return store;
+}
+
+function saveStore(dataDir, store) {
+  writeJson(storeFile(dataDir), normalizeStore(store));
 }
 
 function createSeedStore(nowIso) {
@@ -308,6 +314,27 @@ function createSeedStore(nowIso) {
       { id: 'risk-at8', severity: 'high', projectId: 'project-tau', title: 'AT8 antibody backorder', mitigation: 'Check alternate vendors and validate substitute clone.' },
       { id: 'risk-qc', severity: 'medium', projectId: 'project-crispr', title: 'CRISPR library QC delayed', mitigation: 'Reserve analysis time and escalate if QC misses Friday.' },
     ],
+    customSections: [
+      {
+        id: 'section-reagent-watch',
+        title: 'Reagent Watch',
+        module: 'wet_lab_ops',
+        purpose: 'Track supply constraints that can block experiments.',
+        layout: 'table',
+        createdBy: 'seed',
+        createdAt: at(0, 7),
+        updatedAt: at(0, 7),
+        fields: [
+          { label: 'Reagent', type: 'text', value: 'AT8 antibody' },
+          { label: 'State', type: 'status', value: 'Backorder risk' },
+          { label: 'Owner', type: 'person', value: 'Jordan' },
+        ],
+        signals: ['Backorder may slip staining by 4 days.', 'Alternative vendor decision needed.'],
+        actions: ['Confirm substitute clone.', 'Update Tau Pathology Study timeline.'],
+        integrations: ['Slack', 'Notion', 'Zoom'],
+        dataPolicy: 'Local section seeded from demo workspace.',
+      },
+    ],
     insights: [],
     schedulePlans: [],
     progressEvents: [],
@@ -330,6 +357,61 @@ function openTasks(store) {
   return store.tasks
     .filter((task) => task.status !== 'done')
     .sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority) || String(a.due || '').localeCompare(String(b.due || '')));
+}
+
+function slug(value) {
+  const text = String(value || 'section')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 42);
+  return text || 'section';
+}
+
+function sanitizeString(value, fallback, max = 220) {
+  const text = String(value || fallback || '').replace(/\s+/g, ' ').trim();
+  return text.slice(0, max);
+}
+
+function sanitizeList(value, maxItems = 8, maxText = 180) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => sanitizeString(typeof item === 'string' ? item : item?.text || item?.label || item?.title, '', maxText))
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
+function sanitizeFields(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((field) => ({
+      label: sanitizeString(field?.label, 'Field', 64),
+      type: sanitizeString(field?.type, 'text', 32),
+      value: sanitizeString(field?.value, '', 120),
+    }))
+    .filter((field) => field.label)
+    .slice(0, 10);
+}
+
+function sanitizeSection(input = {}, createdBy = 'manual') {
+  const now = new Date().toISOString();
+  const title = sanitizeString(input.title, 'Custom Lab Section', 80);
+  return {
+    id: sanitizeString(input.id, `section-${slug(title)}-${Date.now()}`, 80),
+    title,
+    module: sanitizeString(input.module, 'custom_lab_ops', 64),
+    purpose: sanitizeString(input.purpose, 'Custom lab operating surface.', 240),
+    layout: ['board', 'table', 'brief', 'checklist', 'timeline'].includes(input.layout) ? input.layout : 'brief',
+    createdBy: sanitizeString(input.createdBy, createdBy, 32),
+    createdAt: input.createdAt || now,
+    updatedAt: now,
+    fields: sanitizeFields(input.fields),
+    signals: sanitizeList(input.signals, 8, 180),
+    actions: sanitizeList(input.actions, 8, 180),
+    automations: sanitizeList(input.automations, 6, 180),
+    integrations: sanitizeList(input.integrations, 8, 80),
+    dataPolicy: sanitizeString(input.dataPolicy, 'Local-first; no external publishing unless an integration is configured and explicitly used.', 240),
+  };
 }
 
 function buildState(store, env = process.env) {
@@ -356,6 +438,7 @@ function buildState(store, env = process.env) {
     aiSuggestions: store.aiSuggestions,
     risks: store.risks.map((risk) => ({ ...risk, project: projectName(store, risk.projectId) })),
     decisions: store.decisions,
+    customSections: store.customSections,
     auditLog: store.auditLog.slice(-10),
     aiRuns: store.aiRuns.slice(-10),
   };
@@ -373,6 +456,7 @@ function integrationStatuses(env = process.env) {
       surface: 'Outlook mail, Outlook calendar, OneDrive',
       status: envStatus(env, 'MICROSOFT_CLIENT_ID') ? 'configured' : 'not configured',
       required: ['MICROSOFT_CLIENT_ID', 'MICROSOFT_CLIENT_SECRET'],
+      setup: ['Create Microsoft Entra app', 'Add mail/calendar scopes', 'Complete OAuth consent', 'Run sync adapter'],
       nextStep: 'Configure Microsoft OAuth before syncing school mail and calendars.',
     },
     {
@@ -381,6 +465,7 @@ function integrationStatuses(env = process.env) {
       surface: 'Gmail, Google Calendar, Drive',
       status: envStatus(env, 'GOOGLE_CLIENT_ID') ? 'configured' : 'not configured',
       required: ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'],
+      setup: ['Create Google OAuth client', 'Add Gmail and Calendar scopes', 'Complete consent', 'Run sync adapter'],
       nextStep: 'Configure Google OAuth before syncing institutional Gmail and calendars.',
     },
     {
@@ -389,6 +474,7 @@ function integrationStatuses(env = process.env) {
       surface: 'Meeting creation, recording imports, transcript imports',
       status: envStatus(env, 'ZOOM_ACCESS_TOKEN') ? 'ready' : envStatus(env, 'ZOOM_CLIENT_ID') ? 'oauth credentials present' : 'not configured',
       required: ['ZOOM_ACCESS_TOKEN', 'ZOOM_CLIENT_ID', 'ZOOM_CLIENT_SECRET'],
+      setup: ['Create Zoom General OAuth app', 'Request meeting:write:meeting', 'Store access token', 'Refresh hourly'],
       nextStep: 'Provide a Zoom access token for beta meeting creation or configure OAuth next.',
     },
     {
@@ -397,6 +483,7 @@ function integrationStatuses(env = process.env) {
       surface: 'Channel updates and meeting follow-up publishing',
       status: envStatus(env, 'SLACK_BOT_TOKEN') ? 'configured' : 'not configured',
       required: ['SLACK_BOT_TOKEN'],
+      setup: ['Create Slack app', 'Install bot to workspace', 'Store bot token', 'Choose publish channels'],
       nextStep: 'Add a Slack bot token before publishing coordination updates.',
     },
     {
@@ -405,6 +492,7 @@ function integrationStatuses(env = process.env) {
       surface: 'Meeting summaries, lab wiki, project notes',
       status: envStatus(env, 'NOTION_TOKEN') ? 'configured' : 'not configured',
       required: ['NOTION_TOKEN'],
+      setup: ['Create Notion integration', 'Share database/page with integration', 'Store token', 'Map summary destination'],
       nextStep: 'Add a Notion integration token before publishing meeting summaries.',
     },
     {
@@ -413,6 +501,7 @@ function integrationStatuses(env = process.env) {
       surface: 'Coordinator notifications through a messaging adapter',
       status: envStatus(env, 'WHATSAPP_ACCESS_TOKEN') || envStatus(env, 'TWILIO_AUTH_TOKEN') ? 'configured' : 'adapter planned',
       required: ['WHATSAPP_ACCESS_TOKEN', 'TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN'],
+      setup: ['Choose WhatsApp or Twilio', 'Write consent policy', 'Store messaging credentials', 'Enable notification rules'],
       nextStep: 'Choose a messaging provider and consent policy before enabling notifications.',
     },
   ];
@@ -510,6 +599,20 @@ ${risks}
 
 Recent and upcoming meetings:
 ${meetings}`;
+}
+
+function extractJsonObject(text) {
+  const raw = String(text || '').trim();
+  try {
+    return JSON.parse(raw);
+  } catch {
+    const start = raw.indexOf('{');
+    const end = raw.lastIndexOf('}');
+    if (start >= 0 && end > start) {
+      return JSON.parse(raw.slice(start, end + 1));
+    }
+    throw new HttpError(502, 'The AI provider did not return a usable section JSON object.', { code: 'invalid_ai_section_json' });
+  }
 }
 
 async function postJson(url, headers, body) {
@@ -719,6 +822,76 @@ ${labContextSummary(store)}`;
   );
 }
 
+async function proposeWorkspaceSection(store, body, env = process.env) {
+  const goal = sanitizeString(body.goal, '', 1200);
+  const labProfile = sanitizeString(body.labProfile, '', 1000);
+  if (!goal) throw new HttpError(400, 'A section goal is required.', { code: 'missing_section_goal' });
+  const prompt = `Design one new Lab Link website section for a research lab. Return only one JSON object with this exact shape:
+{
+  "title": "short section name",
+  "module": "short_snake_case_module",
+  "purpose": "what this section helps the lab do",
+  "layout": "brief|table|board|checklist|timeline",
+  "fields": [{"label":"Field label","type":"text|status|person|date|number","value":"sample value"}],
+  "signals": ["signals this section should watch"],
+  "actions": ["specific actions this section should support"],
+  "automations": ["safe automations or AI-assisted workflows"],
+  "integrations": ["relevant integrations such as Zoom, Slack, Notion, Gmail, Outlook"],
+  "dataPolicy": "privacy and review policy for this section"
+}
+
+Goal:
+${goal}
+
+Optional lab profile:
+${labProfile || 'No extra profile provided.'}
+
+Current Lab Link state:
+${labContextSummary(store)}
+
+Rules:
+- Be specific to this lab.
+- Do not claim an integration is active unless it is listed as configured in the state.
+- Keep it useful as a real product section, not a marketing concept.
+- No decorative content, no invented people, no fake data sources.`;
+  const result = await runAiText(
+    store,
+    'web.workspace.proposeSection',
+    prompt,
+    'You design practical, audit-friendly research lab operations software. Return valid JSON only. Do not include Markdown fences.',
+    env,
+    body.provider || null,
+  );
+  const parsed = extractJsonObject(result.text);
+  return {
+    section: sanitizeSection(parsed, `ai:${result.provider.id}`),
+    provider: result.provider,
+    latencyMs: result.latencyMs,
+  };
+}
+
+function addWorkspaceSection(store, body) {
+  const section = sanitizeSection(body.section || body, body.createdBy || 'manual');
+  const existingIndex = store.customSections.findIndex((item) => item.id === section.id);
+  if (existingIndex >= 0) store.customSections[existingIndex] = section;
+  else store.customSections.unshift(section);
+  store.auditLog.push({
+    id: `audit-${Date.now()}`,
+    at: new Date().toISOString(),
+    actor: store.user.id,
+    action: 'custom_section_saved',
+    detail: `${section.title} saved to Lab Builder.`,
+  });
+  return section;
+}
+
+function deleteWorkspaceSection(store, body) {
+  const id = sanitizeString(body.id, '', 80);
+  const before = store.customSections.length;
+  store.customSections = store.customSections.filter((section) => section.id !== id);
+  return before !== store.customSections.length;
+}
+
 async function createZoomMeeting(body, env = process.env) {
   if (!envStatus(env, 'ZOOM_ACCESS_TOKEN')) {
     throw new HttpError(409, 'Zoom access token is not configured. Lab Link will not fabricate meeting links.', {
@@ -835,6 +1008,23 @@ async function handleApi(request, response, context, pathname) {
     const result = await analyzeMeeting(store, body, context.env);
     return sendJson(response, 200, result);
   }
+  if (request.method === 'POST' && pathname === '/api/workspace/propose') {
+    const body = await readBody(request);
+    const result = await proposeWorkspaceSection(store, body, context.env);
+    return sendJson(response, 200, result);
+  }
+  if (request.method === 'POST' && pathname === '/api/workspace/sections') {
+    const body = await readBody(request);
+    const section = addWorkspaceSection(store, body);
+    saveStore(context.dataDir, store);
+    return sendJson(response, 200, { section, state: buildState(store, context.env) });
+  }
+  if (request.method === 'POST' && pathname === '/api/workspace/sections/delete') {
+    const body = await readBody(request);
+    const deleted = deleteWorkspaceSection(store, body);
+    saveStore(context.dataDir, store);
+    return sendJson(response, 200, { deleted, state: buildState(store, context.env) });
+  }
   if (request.method === 'POST' && pathname === '/api/zoom/start') {
     const body = await readBody(request);
     const result = await createZoomMeeting(body, context.env);
@@ -871,9 +1061,12 @@ function runWebSmoke(args = []) {
   assert(index.includes('Lab Link'), 'index includes product name');
   assert(css.includes('--canvas'), 'styles define design tokens');
   assert(js.includes('SpeechRecognition'), 'client includes live notes capability check');
+  assert(js.includes('Lab Builder'), 'client includes adaptive Lab Builder');
+  assert(js.includes('/api/workspace/propose'), 'client can request provider-backed section proposals');
   const store = loadStore(dataDir);
   const state = buildState(store, {});
   assert(state.counts.openTasks > 0, 'state exposes open tasks');
+  assert(state.customSections.length > 0, 'state exposes custom sections');
   assert(state.providers.every((provider) => ['configured', 'not configured'].includes(provider.status)), 'providers expose truthful status');
   const rules = extractMeetingRules({
     agenda: 'AT8 supply\nCohort 2 perfusion\nOpen field analysis',
@@ -886,6 +1079,8 @@ function runWebSmoke(args = []) {
   assert(!provider.available, 'empty environment does not resolve a real AI provider');
   const zoom = integrationStatuses({}).find((item) => item.id === 'zoom');
   assert(zoom.status === 'not configured', 'empty environment does not claim Zoom readiness');
+  const section = sanitizeSection({ title: 'Protocol Tracker', fields: [{ label: 'Protocol', type: 'text', value: 'IHC' }] });
+  assert(section.title === 'Protocol Tracker', 'custom section sanitizer keeps title');
   process.stdout.write('Web smoke passed.\n');
 }
 
