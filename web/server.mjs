@@ -414,6 +414,24 @@ function sanitizeSection(input = {}, createdBy = 'manual') {
   };
 }
 
+function sanitizeOrganizerPlan(input = {}) {
+  const allowedWorkspaces = new Set(['command', 'meetings', 'builder', 'projects', 'ai', 'integrations', 'settings']);
+  const allowedPanels = new Set(['focus', 'tasks', 'risks', 'sections', 'meetings', 'inbox', 'projects', 'ai', 'integrations']);
+  const workspace = allowedWorkspaces.has(input.workspace) ? input.workspace : 'command';
+  const visiblePanels = sanitizeList(input.visiblePanels, 8, 40).filter((panel) => allowedPanels.has(panel));
+  const collapsedPanels = sanitizeList(input.collapsedPanels, 8, 40).filter((panel) => allowedPanels.has(panel));
+  return {
+    workspace,
+    focusTitle: sanitizeString(input.focusTitle, 'Lab focus', 90),
+    focusBrief: sanitizeString(input.focusBrief, 'Review the highest-leverage work and hide the rest until needed.', 260),
+    visiblePanels: visiblePanels.length ? visiblePanels : ['focus', 'tasks', 'sections'],
+    collapsedPanels,
+    pinnedSectionIds: sanitizeList(input.pinnedSectionIds, 8, 80),
+    suggestedActions: sanitizeList(input.suggestedActions, 6, 160),
+    reasoning: sanitizeString(input.reasoning, 'Organized from the current lab state.', 260),
+  };
+}
+
 function buildState(store, env = process.env) {
   return {
     lab: store.lab,
@@ -870,6 +888,53 @@ Rules:
   };
 }
 
+async function organizeWorkspace(store, body, env = process.env) {
+  const intent = sanitizeString(body.intent, '', 1200);
+  if (!intent) throw new HttpError(400, 'A workspace intent is required.', { code: 'missing_workspace_intent' });
+  const prompt = `Organize the Lab Link website for the user right now. Return only one JSON object with this exact shape:
+{
+  "workspace": "command|meetings|builder|projects|ai|integrations|settings",
+  "focusTitle": "short title for the top focus area",
+  "focusBrief": "one concise sentence explaining what matters now",
+  "visiblePanels": ["focus","tasks","risks","sections","meetings","inbox","projects","ai","integrations"],
+  "collapsedPanels": ["panel ids that should start collapsed"],
+  "pinnedSectionIds": ["custom section ids to emphasize"],
+  "suggestedActions": ["short actions the user should consider"],
+  "reasoning": "brief reason for the layout"
+}
+
+User intent:
+${intent}
+
+Current custom sections:
+${store.customSections.map((section) => `- ${section.id}: ${section.title} (${section.purpose})`).join('\n') || 'No custom sections.'}
+
+Current Lab Link state:
+${labContextSummary(store)}
+
+Rules:
+- Keep the workspace minimal. Prefer 2 to 4 visible panels.
+- Hide or collapse anything not directly relevant to the intent.
+- Do not create new data or claim external sync happened.
+- If the intent is about meetings, include meetings and tasks.
+- If the intent is about setup, include integrations and sections.
+- If the intent is about execution, include focus, tasks, and risks only when risks matter.`;
+  const result = await runAiText(
+    store,
+    'web.workspace.organize',
+    prompt,
+    'You are Lab Link, a practical lab workspace organizer. Return valid JSON only. Optimize for calm, selective, high-leverage work surfaces.',
+    env,
+    body.provider || null,
+  );
+  const parsed = extractJsonObject(result.text);
+  return {
+    plan: sanitizeOrganizerPlan(parsed),
+    provider: result.provider,
+    latencyMs: result.latencyMs,
+  };
+}
+
 function addWorkspaceSection(store, body) {
   const section = sanitizeSection(body.section || body, body.createdBy || 'manual');
   const existingIndex = store.customSections.findIndex((item) => item.id === section.id);
@@ -1013,6 +1078,11 @@ async function handleApi(request, response, context, pathname) {
     const result = await proposeWorkspaceSection(store, body, context.env);
     return sendJson(response, 200, result);
   }
+  if (request.method === 'POST' && pathname === '/api/workspace/organize') {
+    const body = await readBody(request);
+    const result = await organizeWorkspace(store, body, context.env);
+    return sendJson(response, 200, result);
+  }
   if (request.method === 'POST' && pathname === '/api/workspace/sections') {
     const body = await readBody(request);
     const section = addWorkspaceSection(store, body);
@@ -1063,6 +1133,7 @@ function runWebSmoke(args = []) {
   assert(js.includes('SpeechRecognition'), 'client includes live notes capability check');
   assert(js.includes('Lab Builder'), 'client includes adaptive Lab Builder');
   assert(js.includes('/api/workspace/propose'), 'client can request provider-backed section proposals');
+  assert(js.includes('/api/workspace/organize'), 'client can request provider-backed workspace organization');
   const store = loadStore(dataDir);
   const state = buildState(store, {});
   assert(state.counts.openTasks > 0, 'state exposes open tasks');
@@ -1081,6 +1152,8 @@ function runWebSmoke(args = []) {
   assert(zoom.status === 'not configured', 'empty environment does not claim Zoom readiness');
   const section = sanitizeSection({ title: 'Protocol Tracker', fields: [{ label: 'Protocol', type: 'text', value: 'IHC' }] });
   assert(section.title === 'Protocol Tracker', 'custom section sanitizer keeps title');
+  const plan = sanitizeOrganizerPlan({ workspace: 'meetings', visiblePanels: ['focus', 'tasks', 'unknown'], collapsedPanels: ['risks'] });
+  assert(plan.workspace === 'meetings' && plan.visiblePanels.length === 2, 'workspace organizer sanitizer works');
   process.stdout.write('Web smoke passed.\n');
 }
 

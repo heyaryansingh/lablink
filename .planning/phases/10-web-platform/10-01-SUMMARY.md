@@ -13,6 +13,8 @@ Status: Complete
 - Refined the default website into a calmer workspace with the intelligence rail hidden by default, a focus-first Command view, and fewer always-visible panels.
 - Added Lab Builder for manually saved custom lab sections and real-provider AI section proposals.
 - Added custom section persistence routes for apply/delete workflows.
+- Replaced the tab-heavy main surface with one workspace selector, a compact AI organizer, and customizable visible/collapsed panels.
+- Added a real-provider workspace organizer route that can choose workspace mode, focus copy, visible panels, collapsed panels, pinned sections, and suggested actions.
 - Added beta packaging coverage for the website and web smoke checks.
 
 ## Verification
@@ -21,6 +23,7 @@ Status: Complete
 - `npm run web:smoke` passed.
 - Local HTTP check passed for `/api/health` and `/`.
 - Local HTTP check passed for custom section save/delete.
+- Web smoke now checks the provider-backed workspace organizer route wiring and sanitizer.
 - `npm run validate` passed.
 - `npm run release:check` passed and validated installed package web smoke.
 
@@ -31,6 +34,7 @@ Status: Complete
 - Third-party meeting assistant products are product references only; source copying is out of scope.
 - The weakest issue found was duplicate direct-run execution when importing the web server from the CLI; it was fixed by checking the actual process entrypoint.
 - The second refinement removed visual crowding by making the context rail optional and moving lab customization into Lab Builder rather than overloading the command rail.
+- The third refinement removed persistent screen tabs and made AI act on the current workspace instead of living only in a separate AI page.
 
 ## Next
 

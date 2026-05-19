@@ -32,7 +32,25 @@ const state = {
   density: 'compact',
   railFocus: 'operations',
   showIntel: false,
+  customize: false,
+  visiblePanels: {
+    focus: true,
+    tasks: true,
+    sections: true,
+    risks: false,
+    meetings: false,
+    inbox: false,
+    projects: false,
+    ai: false,
+    integrations: false,
+  },
+  collapsedPanels: {},
   visibleModules: {},
+  organizer: {
+    intent: 'Help me focus on what matters for the lab today.',
+    plan: null,
+    busy: null,
+  },
   builder: {
     goal: 'Create a section that helps our lab track experiment readiness, blockers, owners, and next actions across meetings and messages.',
     labProfile: 'Wet lab with imaging, animal work, grants, reagents, shared equipment, and weekly lab meetings.',
@@ -67,6 +85,9 @@ function loadPrefs() {
     if (prefs.density) state.density = prefs.density;
     if (prefs.railFocus) state.railFocus = prefs.railFocus;
     if (typeof prefs.showIntel === 'boolean') state.showIntel = prefs.showIntel;
+    if (typeof prefs.customize === 'boolean') state.customize = prefs.customize;
+    if (prefs.visiblePanels) state.visiblePanels = { ...state.visiblePanels, ...prefs.visiblePanels };
+    if (prefs.collapsedPanels) state.collapsedPanels = prefs.collapsedPanels;
     if (prefs.visibleModules) state.visibleModules = prefs.visibleModules;
   } catch {
     localStorage.removeItem(STORAGE_KEY);
@@ -80,6 +101,9 @@ function savePrefs() {
     density: state.density,
     railFocus: state.railFocus,
     showIntel: state.showIntel,
+    customize: state.customize,
+    visiblePanels: state.visiblePanels,
+    collapsedPanels: state.collapsedPanels,
     visibleModules: state.visibleModules,
   }));
 }
@@ -194,7 +218,7 @@ function render() {
 }
 
 function renderTopbar() {
-  const { lab, user, counts } = state.data;
+  const { lab, user } = state.data;
   return `
     <header class="topbar">
       <div>
@@ -202,10 +226,11 @@ function renderTopbar() {
         <div class="muted small">${escapeHtml(lab.institution)} - ${escapeHtml(user.name)} (${escapeHtml(user.role)})</div>
       </div>
       <div class="topbar-actions">
-        <button class="button ghost" type="button" data-action="refresh">Refresh</button>
-        <button class="button ghost" type="button" data-action="toggle-intel">${state.showIntel ? 'Hide Context' : 'Show Context'}</button>
-        <button class="button secondary" type="button" data-tab="builder">Build Section</button>
-        <button class="button primary" type="button" data-tab="meetings">${plural(counts.meetings, 'meeting')}</button>
+        <select class="workspace-select" id="workspace-select" aria-label="Workspace">
+          ${TABS.map((tab) => `<option value="${tab.id}" ${state.activeTab === tab.id ? 'selected' : ''}>${escapeHtml(tab.label)}</option>`).join('')}
+        </select>
+        <button class="button ghost" type="button" data-action="toggle-customize">${state.customize ? 'Done' : 'Customize'}</button>
+        <button class="button primary" type="button" data-action="organize-workspace" ${state.organizer.busy ? 'disabled' : ''}>AI Organize</button>
       </div>
     </header>`;
 }
@@ -214,83 +239,101 @@ function configuredIntegrations() {
   return state.data.integrations.filter((item) => ['configured', 'ready', 'oauth credentials present'].includes(item.status)).length;
 }
 
+function providerReady() {
+  return state.data.providers.some((item) => item.status === 'configured');
+}
+
+const PANEL_LABELS = {
+  focus: 'Focus',
+  tasks: 'Tasks',
+  sections: 'Lab sections',
+  risks: 'Risks',
+  meetings: 'Meetings',
+  inbox: 'Inbox',
+  projects: 'Projects',
+  ai: 'AI review',
+  integrations: 'Integrations',
+};
+
 function renderRail() {
   return `
     <section class="lab-card">
       <div class="eyebrow">Workspace</div>
       <h2>${escapeHtml(state.data.lab.name)}</h2>
-      <div class="meta">
-        <span class="pill">${escapeHtml(state.density)}</span>
-        <span class="pill">${escapeHtml(state.railFocus)}</span>
-      </div>
+      <p class="muted small">A selective lab manager shaped around the work in front of you.</p>
     </section>
     <section class="rail-section">
-      <div class="rail-section-title">Navigation</div>
-      <div class="nav-list">
-        ${state.tabOrder.map((id) => renderNavItem(tabById(id))).join('')}
+      <div class="rail-section-title">AI Organizer</div>
+      <div class="field rail-field">
+        <textarea id="organizer-intent">${escapeHtml(state.organizer.intent)}</textarea>
       </div>
+      <button class="button primary full" type="button" data-action="organize-workspace" ${state.organizer.busy ? 'disabled' : ''}>Organize This View</button>
+      <div class="muted small rail-note">${providerReady() ? 'Uses your configured provider.' : 'Requires a real AI provider.'}</div>
     </section>
+    ${state.customize ? renderPanelChooser() : ''}
     <section class="rail-section">
-      <div class="rail-section-title">Workspace</div>
-      <div class="segmented">
-        ${['operations', 'meetings', 'integrations'].map((mode) => `
-          <button class="button compact ${state.railFocus === mode ? 'secondary' : 'ghost'}" type="button" data-action="rail-focus" data-mode="${mode}">${mode}</button>
-        `).join('')}
-      </div>
-    </section>
-    <section class="rail-section">
-      <div class="rail-section-title">Controls</div>
-      <div class="status-list">
-        <button class="status-item as-button" type="button" data-action="toggle-intel">
-          <span>Context rail</span><span class="pill ${state.showIntel ? 'ok' : ''}">${state.showIntel ? 'shown' : 'hidden'}</span>
-        </button>
-        <button class="status-item as-button" type="button" data-action="density-toggle">
-          <span>Density</span><span class="pill">${escapeHtml(state.density)}</span>
-        </button>
-      </div>
-    </section>
-    <section class="rail-section">
-      <div class="rail-section-title">Signals</div>
-      <div class="status-list">
-        <div class="status-item"><span>Open tasks</span><span class="count">${state.data.counts.openTasks}</span></div>
-        <div class="status-item"><span>Unread inbox</span><span class="count">${state.data.counts.unread}</span></div>
-        <div class="status-item"><span>Pending review</span><span class="count">${state.data.counts.pendingAi}</span></div>
+      <div class="rail-section-title">Quick State</div>
+      <div class="quiet-metrics">
+        <span>${state.data.counts.openTasks} tasks</span>
+        <span>${state.data.counts.risks} risks</span>
+        <span>${configuredIntegrations()} integrations</span>
       </div>
     </section>`;
 }
 
-function renderNavItem(tab) {
-  const counts = {
-    command: state.data.counts.openTasks,
-    meetings: state.data.counts.meetings,
-    builder: state.data.customSections?.length || 0,
-    projects: state.data.counts.projects,
-    ai: state.data.counts.pendingAi,
-    integrations: configuredIntegrations(),
-    settings: Object.keys(state.visibleModules).length,
-  };
+function renderPanelChooser() {
   return `
-    <button class="nav-item ${state.activeTab === tab.id ? 'active' : ''}" type="button" data-nav="${tab.id}">
-      <span class="nav-key">${tab.key}</span>
-      <span class="nav-label">${escapeHtml(tab.label)}</span>
-      <span class="count">${counts[tab.id] ?? 0}</span>
-    </button>`;
+    <section class="rail-section">
+      <div class="rail-section-title">Visible Panels</div>
+      <div class="panel-chooser">
+        ${Object.entries(PANEL_LABELS).map(([id, label]) => `
+          <label class="toggle-line">
+            <input type="checkbox" data-panel-visible="${id}" ${state.visiblePanels[id] ? 'checked' : ''}>
+            <span>${escapeHtml(label)}</span>
+          </label>
+        `).join('')}
+      </div>
+    </section>`;
 }
 
 function renderMain() {
   return `
-    <div class="workspace-tabs">
-      ${state.tabOrder.map((id) => renderWorkspaceTab(tabById(id))).join('')}
-    </div>
+    ${renderAdaptiveBar()}
+    ${state.organizer.plan ? renderOrganizerPlan() : ''}
     ${renderActiveView()}`;
 }
 
-function renderWorkspaceTab(tab) {
+function renderAdaptiveBar() {
   return `
-    <button class="workspace-tab ${state.activeTab === tab.id ? 'active' : ''}" type="button" draggable="true" data-tab="${tab.id}" title="Drag to reorder">
-      <span class="tab-grip">::</span>
-      <span>${escapeHtml(tab.label)}</span>
-    </button>`;
+    <section class="adaptive-bar">
+      <div>
+        <div class="eyebrow">Adaptive Workspace</div>
+        <strong>${escapeHtml(tabById(state.activeTab).label)}</strong>
+      </div>
+      <div class="adaptive-actions">
+        <button class="button compact ghost" type="button" data-action="density-toggle">${escapeHtml(state.density)}</button>
+        <button class="button compact ghost" type="button" data-action="toggle-intel">${state.showIntel ? 'Hide context' : 'Context'}</button>
+        <button class="button compact" type="button" data-action="focus-preset">Focus preset</button>
+        <button class="button compact" type="button" data-action="everything-preset">Everything</button>
+      </div>
+    </section>`;
+}
+
+function renderOrganizerPlan() {
+  const plan = state.organizer.plan;
+  return `
+    <section class="organizer-plan">
+      <div>
+        <div class="eyebrow">AI Organized</div>
+        <h2>${escapeHtml(plan.focusTitle)}</h2>
+        <p>${escapeHtml(plan.focusBrief)}</p>
+      </div>
+      ${(plan.suggestedActions || []).length ? `
+        <div class="suggested-actions">
+          ${plan.suggestedActions.slice(0, 4).map((item) => `<span>${escapeHtml(item)}</span>`).join('')}
+        </div>
+      ` : ''}
+    </section>`;
 }
 
 function renderActiveView() {
@@ -303,63 +346,76 @@ function renderActiveView() {
   return renderCommand();
 }
 
+function panelEnabled(id) {
+  return Boolean(state.visiblePanels[id]);
+}
+
+function panelCollapsed(id) {
+  return Boolean(state.collapsedPanels[id]);
+}
+
+function renderPanel(id, title, subtitle, content, actions = '') {
+  if (!panelEnabled(id)) return '';
+  const collapsed = panelCollapsed(id);
+  return `
+    <section class="panel quiet-panel adaptive-panel" data-panel="${id}">
+      <div class="panel-header">
+        <div><div class="eyebrow">${escapeHtml(title)}</div><div class="panel-title">${escapeHtml(subtitle)}</div></div>
+        <div class="inline-actions">
+          ${actions}
+          <button class="button compact ghost" type="button" data-action="collapse-panel" data-panel-id="${id}">${collapsed ? 'Open' : 'Close'}</button>
+          ${state.customize ? `<button class="button compact ghost" type="button" data-action="hide-panel" data-panel-id="${id}">Hide</button>` : ''}
+        </div>
+      </div>
+      ${collapsed ? '' : content}
+    </section>`;
+}
+
 function renderCommand() {
   const leadTask = state.data.tasks[0];
   const nextMeeting = state.data.meetings.find((meeting) => meeting.status === 'scheduled') || state.data.meetings[0];
   const customSections = state.data.customSections || [];
+  const plan = state.organizer.plan;
   return `
     <section class="view-header">
       <div>
         <div class="eyebrow">Command Center</div>
-        <h1>Today, without the noise</h1>
-        <p>A calmer operating layer: one focus, one meeting thread, visible risks, and custom lab sections you can evolve with AI.</p>
+        <h1>${escapeHtml(plan?.focusTitle || 'One workspace, selectively arranged')}</h1>
+        <p>${escapeHtml(plan?.focusBrief || 'Lab Link now hides the surface area you do not need and lets AI reorganize the workspace around the moment.')}</p>
       </div>
       <div class="inline-actions">
-        <button class="button secondary" type="button" data-tab="builder">Customize</button>
-        <button class="button primary" type="button" data-tab="meetings">Meeting Studio</button>
+        <button class="button secondary" type="button" data-action="toggle-customize">${state.customize ? 'Done customizing' : 'Customize layout'}</button>
+        <button class="button primary" type="button" data-action="organize-workspace" ${state.organizer.busy ? 'disabled' : ''}>AI Organize</button>
       </div>
     </section>
-    <section class="focus-strip">
-      <article class="focus-card primary-focus">
-        <div class="eyebrow">Primary Focus</div>
-        <h2>${escapeHtml(leadTask?.title || 'No open task')}</h2>
-        <div class="meta">
-          <span class="pill ${statusClass(leadTask?.priority)}">${escapeHtml(leadTask?.priority || 'clear')}</span>
-          <span>${escapeHtml(leadTask?.project || 'No project')}</span>
-          <span>${escapeHtml(leadTask?.assignee || 'Unassigned')}</span>
+    ${panelEnabled('focus') ? `
+      <section class="focus-canvas">
+        <div>
+          <div class="eyebrow">Primary Focus</div>
+          <h2>${escapeHtml(leadTask?.title || 'No open task')}</h2>
+          <p>${escapeHtml(leadTask?.reason || 'The queue is clear.')}</p>
+          <div class="meta">
+            <span class="pill ${statusClass(leadTask?.priority)}">${escapeHtml(leadTask?.priority || 'clear')}</span>
+            <span>${escapeHtml(leadTask?.project || 'No project')}</span>
+            <span>${escapeHtml(leadTask?.assignee || 'Unassigned')}</span>
+          </div>
         </div>
-        <p class="muted">${escapeHtml(leadTask?.reason || 'The queue is clear.')}</p>
-      </article>
-      <article class="focus-card">
-        <div class="eyebrow">Next Meeting</div>
-        <h2>${escapeHtml(nextMeeting?.title || 'No meeting scheduled')}</h2>
-        <p class="muted">${escapeHtml(nextMeeting?.summary || 'No meeting context yet.')}</p>
-        <div class="meta"><span>${escapeHtml(formatTime(nextMeeting?.at))}</span><span class="pill ${statusClass(nextMeeting?.status)}">${escapeHtml(nextMeeting?.status || 'none')}</span></div>
-      </article>
-      <article class="focus-card">
-        <div class="eyebrow">System</div>
-        <h2>${state.data.counts.pendingAi} review items</h2>
-        <p class="muted">${configuredIntegrations()} configured integration surface${configuredIntegrations() === 1 ? '' : 's'}.</p>
-        <div class="meta"><button class="button compact" type="button" data-tab="ai">Review</button><button class="button compact" type="button" data-tab="integrations">Setup</button></div>
-      </article>
-    </section>
-    <section class="grid two airy-grid">
-      <div class="panel quiet-panel">
-        <div class="panel-header"><div><div class="eyebrow">Priority Queue</div><div class="panel-title">Next four tasks</div></div></div>
-        <div class="item-list">${state.data.tasks.slice(0, 4).map(renderTask).join('')}</div>
-      </div>
-      <div class="panel quiet-panel">
-        <div class="panel-header"><div><div class="eyebrow">Risk Radar</div><div class="panel-title">Only active blockers</div></div></div>
-        <div class="item-list">${state.data.risks.map(renderRisk).join('')}</div>
-      </div>
-    </section>
-    <section class="panel quiet-panel airy-grid">
-      <div class="panel-header">
-        <div><div class="eyebrow">Adaptive Lab Sections</div><div class="panel-title">Specialized surfaces for this lab</div></div>
-        <button class="button compact" type="button" data-tab="builder">Build more</button>
-      </div>
-      <div class="section-grid">${customSections.slice(0, 3).map(renderCustomSection).join('') || '<div class="muted">No custom sections yet.</div>'}</div>
-    </section>`;
+        <div class="focus-side">
+          <span>${state.data.counts.openTasks} tasks</span>
+          <span>${state.data.counts.risks} risks</span>
+          <span>${state.data.counts.pendingAi} reviews</span>
+        </div>
+      </section>` : ''}
+    <div class="adaptive-stack">
+      ${renderPanel('tasks', 'Priority Queue', 'Only the work that should stay visible', `<div class="item-list">${state.data.tasks.slice(0, 4).map(renderTask).join('')}</div>`)}
+      ${renderPanel('sections', 'Lab Sections', 'Custom surfaces for this lab', `<div class="section-grid compact-sections">${customSections.slice(0, 3).map(renderCustomSection).join('') || '<div class="muted">No custom sections yet.</div>'}</div>`, '<button class="button compact" type="button" data-tab="builder">Build</button>')}
+      ${renderPanel('risks', 'Risk Radar', 'Only blockers that change the plan', `<div class="item-list">${state.data.risks.map(renderRisk).join('')}</div>`)}
+      ${renderPanel('meetings', 'Meetings', 'The current coordination thread', `<div class="item-list">${state.data.meetings.map(renderMeetingRow).join('')}</div>`, '<button class="button compact" type="button" data-tab="meetings">Studio</button>')}
+      ${renderPanel('inbox', 'Inbox', 'Messages worth converting into action', `<div class="item-list">${state.data.inbox.map(renderInbox).join('')}</div>`)}
+      ${renderPanel('projects', 'Projects', 'Portfolio summary', `<div class="section-grid compact-sections">${state.data.projects.slice(0, 4).map(renderProjectMini).join('')}</div>`)}
+      ${renderPanel('ai', 'AI Review', 'Pending suggestions', `<div class="item-list">${state.data.aiSuggestions.slice(0, 4).map(renderSuggestion).join('')}</div>`)}
+      ${renderPanel('integrations', 'Integrations', 'Configured external surfaces', `<div class="item-list">${state.data.integrations.slice(0, 6).map(renderIntegrationMini).join('')}</div>`)}
+    </div>`;
 }
 
 function renderTask(task) {
@@ -387,6 +443,29 @@ function renderRisk(risk) {
         <span>${escapeHtml(risk.project)}</span>
       </div>
       <p class="muted small">${escapeHtml(risk.mitigation)}</p>
+    </article>`;
+}
+
+function renderProjectMini(project) {
+  return `
+    <article class="section-card mini-section">
+      <div class="section-card-head">
+        <div><div class="eyebrow">${escapeHtml(project.owner)}</div><h3>${escapeHtml(project.name)}</h3></div>
+        <span class="pill ${statusClass(project.status)}">${escapeHtml(project.status)}</span>
+      </div>
+      <div class="progress"><span style="width: ${Math.max(0, Math.min(100, Number(project.completion || 0)))}%;"></span></div>
+      <p class="muted small">${escapeHtml(project.health)}</p>
+    </article>`;
+}
+
+function renderIntegrationMini(item) {
+  return `
+    <article class="queue-item mini-row">
+      <div>
+        <div class="queue-title">${escapeHtml(item.label)}</div>
+        <div class="muted small">${escapeHtml(item.nextStep)}</div>
+      </div>
+      <span class="pill ${statusClass(item.status)}">${escapeHtml(item.status)}</span>
     </article>`;
 }
 
@@ -890,6 +969,74 @@ async function startZoom() {
   }
 }
 
+function applyOrganizerPlan(plan) {
+  state.organizer.plan = plan;
+  state.activeTab = plan.workspace || 'command';
+  const nextVisible = {};
+  for (const key of Object.keys(PANEL_LABELS)) nextVisible[key] = false;
+  for (const key of plan.visiblePanels || ['focus', 'tasks', 'sections']) {
+    if (key in nextVisible) nextVisible[key] = true;
+  }
+  nextVisible.focus = nextVisible.focus || state.activeTab === 'command';
+  state.visiblePanels = nextVisible;
+  const nextCollapsed = {};
+  for (const key of plan.collapsedPanels || []) nextCollapsed[key] = true;
+  state.collapsedPanels = nextCollapsed;
+  savePrefs();
+}
+
+async function organizeWorkspace() {
+  const intent = state.organizer.intent.trim();
+  if (!intent) {
+    state.toast = 'Tell Lab Link what you are trying to do first.';
+    render();
+    return;
+  }
+  state.organizer.busy = 'organizing';
+  render();
+  try {
+    const result = await api('/api/workspace/organize', {
+      method: 'POST',
+      body: JSON.stringify({ intent }),
+    });
+    applyOrganizerPlan(result.plan);
+    state.toast = `Workspace organized by ${result.provider.label}.`;
+  } catch (error) {
+    const required = error.payload?.required ? ` Required: ${error.payload.required.join(', ')}.` : '';
+    state.toast = `${error.message}${required}`;
+  } finally {
+    state.organizer.busy = null;
+    render();
+  }
+}
+
+function applyFocusPreset() {
+  applyOrganizerPlan({
+    workspace: 'command',
+    focusTitle: 'Execution focus',
+    focusBrief: 'Showing only the primary focus, next tasks, and custom lab sections.',
+    visiblePanels: ['focus', 'tasks', 'sections'],
+    collapsedPanels: [],
+    suggestedActions: ['Work top task', 'Review custom section', 'Open context only if needed'],
+  });
+  state.toast = 'Focus preset applied.';
+  render();
+}
+
+function applyEverythingPreset() {
+  state.activeTab = 'command';
+  state.visiblePanels = Object.fromEntries(Object.keys(PANEL_LABELS).map((key) => [key, true]));
+  state.collapsedPanels = { risks: true, inbox: true, projects: true, ai: true, integrations: true };
+  state.organizer.plan = {
+    focusTitle: 'Full workspace',
+    focusBrief: 'Everything is available, with secondary panels collapsed to reduce visual load.',
+    suggestedActions: ['Open only what you need'],
+  };
+  savePrefs();
+  state.toast = 'Full workspace preset applied.';
+  render();
+}
+
 async function proposeSection() {
   if (!state.builder.goal.trim()) {
     state.toast = 'Describe the lab section you want AI to design.';
@@ -1048,6 +1195,14 @@ function handleClick(event) {
     state.toast = error.message;
     render();
   });
+  if (action === 'organize-workspace') organizeWorkspace();
+  if (action === 'focus-preset') applyFocusPreset();
+  if (action === 'everything-preset') applyEverythingPreset();
+  if (action === 'toggle-customize') {
+    state.customize = !state.customize;
+    savePrefs();
+    render();
+  }
   if (action === 'rail-focus') {
     state.railFocus = event.target.closest('[data-action]').dataset.mode;
     savePrefs();
@@ -1060,6 +1215,18 @@ function handleClick(event) {
   }
   if (action === 'density-toggle') {
     state.density = state.density === 'compact' ? 'comfortable' : 'compact';
+    savePrefs();
+    render();
+  }
+  if (action === 'collapse-panel') {
+    const id = event.target.closest('[data-panel-id]').dataset.panelId;
+    state.collapsedPanels[id] = !state.collapsedPanels[id];
+    savePrefs();
+    render();
+  }
+  if (action === 'hide-panel') {
+    const id = event.target.closest('[data-panel-id]').dataset.panelId;
+    state.visiblePanels[id] = false;
     savePrefs();
     render();
   }
@@ -1084,6 +1251,19 @@ function handleClick(event) {
     state.density = 'compact';
     state.railFocus = 'operations';
     state.showIntel = false;
+    state.customize = false;
+    state.visiblePanels = {
+      focus: true,
+      tasks: true,
+      sections: true,
+      risks: false,
+      meetings: false,
+      inbox: false,
+      projects: false,
+      ai: false,
+      integrations: false,
+    };
+    state.collapsedPanels = {};
     state.visibleModules = { ...(state.data.featureFlags || {}) };
     render();
   }
@@ -1100,6 +1280,14 @@ function handleInput(event) {
   if (event.target.id === 'meeting-transcript') {
     state.meeting.transcript = event.target.value;
     scheduleRules();
+  }
+  if (event.target.id === 'workspace-select') {
+    state.activeTab = event.target.value;
+    savePrefs();
+    render();
+  }
+  if (event.target.id === 'organizer-intent') {
+    state.organizer.intent = event.target.value;
   }
   if (event.target.id === 'builder-goal') {
     state.builder.goal = event.target.value;
@@ -1120,6 +1308,11 @@ function handleInput(event) {
   }
   if (event.target.matches('[data-feature]')) {
     state.visibleModules[event.target.dataset.feature] = event.target.checked;
+    savePrefs();
+    render();
+  }
+  if (event.target.matches('[data-panel-visible]')) {
+    state.visiblePanels[event.target.dataset.panelVisible] = event.target.checked;
     savePrefs();
     render();
   }

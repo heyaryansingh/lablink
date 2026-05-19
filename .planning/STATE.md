@@ -62,9 +62,10 @@ Current web platform completion promise:
 - Zoom meeting creation must call a real configured Zoom token or fail with setup guidance; the web product must not invent meeting links.
 - The browser default should stay calm and customizable: optional context rail, focus-first command view, and Lab Builder for lab-specific sections.
 - Lab Builder may use AI to propose new sections only through a real configured provider; manual local sections remain available without AI.
+- The browser should avoid permanent tab clutter: one workspace selector, a compact AI organizer, and user-controlled visible/collapsed panels are the current interaction model.
 
 ## Next Actions
 
 - Start the local web server for browser review.
 - Publish the beta after a final `npm run release:check` in the release environment.
-- Continue OAuth-backed Microsoft/Google/Zoom setup flows, AI-generated section editing, saved layout presets, and richer meeting-to-execution publishing.
+- Continue OAuth-backed Microsoft/Google/Zoom setup flows, AI-generated section editing, saved layout presets, richer meeting-to-execution publishing, and direct manipulation of panel order.
