@@ -51,13 +51,66 @@ function defaultDataDir(args = []) {
   return path.resolve('.lablink-dev');
 }
 
+function secretsFile(dataDir, args = []) {
+  const explicit = parseFlag(args, '--secrets-file', process.env.LABLINK_SECRETS_FILE || null);
+  return explicit ? path.resolve(explicit) : path.join(dataDir, 'secrets.json');
+}
+
+function loadLocalSecrets(dataDir, args = []) {
+  const file = secretsFile(dataDir, args);
+  if (!fs.existsSync(file)) return { file, values: {} };
+  const parsed = readJson(file, {});
+  const source = parsed.secrets && typeof parsed.secrets === 'object' ? parsed.secrets : parsed;
+  const allowedKeys = [
+    'OPENAI_API_KEY',
+    'OPENAI_MODEL',
+    'OPENAI_BASE_URL',
+    'ANTHROPIC_API_KEY',
+    'ANTHROPIC_MODEL',
+    'ANTHROPIC_BASE_URL',
+    'LABLINK_LOCAL_AI_URL',
+    'LABLINK_LOCAL_MODEL',
+    'LABLINK_LOCAL_AI_KEY',
+    'LABLINK_CUSTOM_AI_URL',
+    'LABLINK_CUSTOM_AI_MODEL',
+    'LABLINK_CUSTOM_AI_KEY',
+    'LABLINK_CUSTOM_AI_KEY_ENV',
+    'ZOOM_ACCESS_TOKEN',
+    'ZOOM_CLIENT_ID',
+    'ZOOM_CLIENT_SECRET',
+    'GOOGLE_CLIENT_ID',
+    'GOOGLE_CLIENT_SECRET',
+    'MICROSOFT_CLIENT_ID',
+    'MICROSOFT_CLIENT_SECRET',
+    'SLACK_BOT_TOKEN',
+    'NOTION_TOKEN',
+    'WHATSAPP_ACCESS_TOKEN',
+    'TWILIO_ACCOUNT_SID',
+    'TWILIO_AUTH_TOKEN',
+  ];
+  const values = {};
+  for (const key of allowedKeys) {
+    if (typeof source[key] === 'string' && source[key].trim()) values[key] = source[key].trim();
+  }
+  return { file, values };
+}
+
+function runtimeEnv(dataDir, args = []) {
+  const local = loadLocalSecrets(dataDir, args);
+  return {
+    env: { ...local.values, ...process.env },
+    secretsFile: local.file,
+    loadedSecretKeys: Object.keys(local.values),
+  };
+}
+
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
 }
 
 function readJson(file, fallback) {
   if (!fs.existsSync(file)) return fallback;
-  return JSON.parse(fs.readFileSync(file, 'utf8'));
+  return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
 }
 
 function writeJson(file, value) {
@@ -760,6 +813,7 @@ async function handleApi(request, response, context, pathname) {
       product: 'Lab Link Web',
       runtime: 'web-bootstrap',
       dataDir: context.dataDir,
+      secretsLoaded: context.loadedSecretKeys.length,
     });
   }
   if (request.method === 'GET' && pathname === '/api/state') {
@@ -845,7 +899,8 @@ export async function startWebServer(options = {}) {
   const port = Number(parseFlag(args, '--port', process.env.LABLINK_WEB_PORT || 4867));
   const dataDir = options.dataDir ? path.resolve(options.dataDir) : defaultDataDir(args);
   ensureDir(dataDir);
-  const context = { dataDir, env: process.env };
+  const localRuntime = runtimeEnv(dataDir, args);
+  const context = { dataDir, ...localRuntime };
   const server = http.createServer((request, response) => {
     handleRequest(request, response, context);
   });
@@ -855,6 +910,7 @@ export async function startWebServer(options = {}) {
   });
   process.stdout.write(`Lab Link web running at http://${host}:${port}\n`);
   process.stdout.write(`Data directory: ${dataDir}\n`);
+  if (context.loadedSecretKeys.length) process.stdout.write(`Loaded ${context.loadedSecretKeys.length} local secret(s) from ${context.secretsFile}\n`);
   return server;
 }
 
