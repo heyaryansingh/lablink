@@ -93,11 +93,11 @@ node bin/lablink.mjs web --port 4867
 The bootstrap runtime includes Command Center, Today, Projects, Meetings, AI Review, Settings, transcript import, rules-based review suggestions, AI suggestion approve/reject commands, and a local browser workspace.
 Transcript import and default schedule/progress flows use labeled rules-based automation unless you run the `--ai` provider-backed commands.
 
-The browser workspace includes a command composer, focus canvas, adaptive sections, role presets, optional inspector sheet, Meeting Studio, browser live-note capture when supported, rules-based meeting extraction, real-provider meeting analysis, Zoom creation setup, OAuth URL/code-exchange helpers, and layout preferences saved in browser storage.
+The browser workspace includes a modular Lab Blocks Runtime with workspace tabs, draggable blocks, per-block subtabs, role presets, optional inspector sheet, Meeting Studio, browser live-note capture when supported, rules-based meeting extraction, real-provider meeting analysis, Zoom creation setup, OAuth URL/code-exchange helpers, and layout preferences saved in browser storage.
 
 The web beta also includes Lab Builder, an adaptive workspace composer. It can save local custom lab sections manually, or use a configured real AI provider to propose new section designs for things like reagent tracking, protocol readiness, equipment coordination, grants, onboarding, or lab-specific review queues. Provider-backed section generation fails with setup guidance if no real AI provider is configured.
 
-The workspace can also be reorganized by AI from the command composer. Describe the current intent, run Organize, and Lab Link selects the workspace, section order, visible sections, collapsed sections, focus title, and suggested actions. This is provider-backed only; no local fake AI layout is returned. Motion One, Floating UI, and SortableJS load progressively in the browser when available; native fallback behavior remains.
+The workspace can also be reorganized by AI from the command composer. Describe the current intent, run Organize, and Lab Link selects the workspace, block order, visible blocks, collapsed blocks, block subtabs, focus title, and suggested actions. This is provider-backed only; no local fake AI layout is returned. Motion One, Floating UI, and SortableJS load progressively in the browser when available; native fallback behavior remains.
 
 Run the full package release check before publishing:
 

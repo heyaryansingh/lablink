@@ -1,6 +1,6 @@
 {
   "name": "lablink-cli",
-  "version": "0.1.0-beta.7",
+  "version": "0.1.0-beta.8",
   "description": "Local-first terminal operating system for research labs",
   "type": "module",
   "license": "MIT",
@@ -36,6 +36,7 @@
     "docs/product/PRD_V2_3_REAL_AI_ACTIONS.md",
     "docs/product/PRD_V2_4_WEB_PLATFORM.md",
     "docs/product/PRD_V2_6_REFINED_INTERACTION_DESIGN.md",
+    "docs/product/PRD_V2_7_MODULAR_BLOCK_WORKSPACE.md",
     ".env.example",
     "README.md",
     "LICENSE"

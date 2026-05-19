@@ -22,6 +22,7 @@
 - PRD v2.2 is the active build-grade specification: `docs/product/PRD_V2_2.md`.
 - PRD v2.3 real AI/action layer is active for provider-backed beta work: `docs/product/PRD_V2_3_REAL_AI_ACTIONS.md`.
 - PRD v2.4 web platform is active for the browser workspace, meeting studio, and integration-readiness layer: `docs/product/PRD_V2_4_WEB_PLATFORM.md`.
+- PRD v2.7 modular block workspace is active for the tabbed Lab Blocks Runtime: `docs/product/PRD_V2_7_MODULAR_BLOCK_WORKSPACE.md`.
 - PRD v2 remains the prior baseline specification: `docs/product/PRD_V2.md`.
 - PRD v2.1 launch spec is active for the npm-launch layer: `docs/product/PRD_V2_1_LAUNCH_SPEC.md`.
 - Capability gap tracking v2.2 is active: `docs/product/CAPABILITY_GAP_V2_2.md`.
@@ -48,7 +49,7 @@ Current AI/action completion promise:
 
 Current web platform completion promise:
 
-`LABLINK_WEB_PLATFORM_BETA_READY`
+`LABLINK_MODULAR_BLOCK_WORKSPACE_BETA8`
 
 ## Current Risks
 
@@ -64,6 +65,7 @@ Current web platform completion promise:
 - Lab Builder may use AI to propose new sections only through a real configured provider; manual local sections remain available without AI.
 - The browser should avoid permanent tab clutter: one workspace selector, a compact AI organizer, and user-controlled visible/collapsed panels are the current interaction model.
 - The refined v2.6 browser should avoid native-looking primary dropdowns and dashboard walls: command composer, focus canvas, adaptive sections, role presets, inspector sheet, progressive Motion/Floating UI/Sortable enhancement, guided OAuth URL/code-exchange helpers, and real-provider AI organization are the current interaction model.
+- The v2.7 browser restores the modular block design: workspace tabs, draggable lab blocks, per-block subtabs, animated organize loading, AI-controlled block plans, and manual block controls.
 
 ## Next Actions
 

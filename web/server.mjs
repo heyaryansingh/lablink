@@ -432,12 +432,34 @@ function sanitizeSection(input = {}, createdBy = 'manual') {
 }
 
 function sanitizeOrganizerPlan(input = {}) {
-  const allowedWorkspaces = new Set(['command', 'meetings', 'builder', 'projects', 'ai', 'integrations', 'settings']);
+  const allowedWorkspaces = new Set(['command', 'experiments', 'meetings', 'builder', 'projects', 'ai', 'integrations', 'settings']);
   const allowedPanels = new Set(['focus', 'tasks', 'risks', 'sections', 'meetings', 'inbox', 'projects', 'ai', 'integrations']);
+  const allowedBlocks = new Set([
+    'priority-queue',
+    'experiment-readiness',
+    'meeting-studio',
+    'reagent-watch',
+    'project-health',
+    'risk-radar',
+    'calendar-pressure',
+    'integration-routes',
+    'ai-review',
+    'inbox-signals',
+    'custom-sections',
+  ]);
   const workspace = allowedWorkspaces.has(input.workspace) ? input.workspace : 'command';
   const visiblePanels = sanitizeList(input.visiblePanels, 8, 40).filter((panel) => allowedPanels.has(panel));
   const collapsedPanels = sanitizeList(input.collapsedPanels, 8, 40).filter((panel) => allowedPanels.has(panel));
   const orderedPanels = sanitizeList(input.orderedPanels, 10, 40).filter((panel) => allowedPanels.has(panel));
+  const visibleBlocks = sanitizeList(input.visibleBlocks, 12, 60).filter((block) => allowedBlocks.has(block));
+  const orderedBlocks = sanitizeList(input.orderedBlocks, 12, 60).filter((block) => allowedBlocks.has(block));
+  const collapsedBlocks = sanitizeList(input.collapsedBlocks, 12, 60).filter((block) => allowedBlocks.has(block));
+  const blockSubtabs = {};
+  if (input.blockSubtabs && typeof input.blockSubtabs === 'object') {
+    for (const [block, subtab] of Object.entries(input.blockSubtabs)) {
+      if (allowedBlocks.has(block)) blockSubtabs[block] = sanitizeString(subtab, '', 40);
+    }
+  }
   return {
     workspace,
     focusTitle: sanitizeString(input.focusTitle, 'Lab focus', 90),
@@ -445,6 +467,10 @@ function sanitizeOrganizerPlan(input = {}) {
     orderedPanels: orderedPanels.length ? orderedPanels : visiblePanels.length ? visiblePanels : ['tasks', 'sections', 'meetings', 'risks', 'projects', 'integrations', 'ai', 'inbox'],
     visiblePanels: visiblePanels.length ? visiblePanels : ['focus', 'tasks', 'sections'],
     collapsedPanels,
+    orderedBlocks: orderedBlocks.length ? orderedBlocks : visibleBlocks.length ? visibleBlocks : ['priority-queue', 'experiment-readiness', 'meeting-studio', 'reagent-watch', 'project-health', 'calendar-pressure'],
+    visibleBlocks: visibleBlocks.length ? visibleBlocks : ['priority-queue', 'experiment-readiness', 'meeting-studio', 'reagent-watch'],
+    collapsedBlocks,
+    blockSubtabs,
     pinnedSectionIds: sanitizeList(input.pinnedSectionIds, 8, 80),
     suggestedActions: sanitizeList(input.suggestedActions, 6, 160),
     reasoning: sanitizeString(input.reasoning, 'Organized from the current lab state.', 260),
@@ -979,11 +1005,15 @@ async function organizeWorkspace(store, body, env = process.env) {
   if (!intent) throw new HttpError(400, 'A workspace intent is required.', { code: 'missing_workspace_intent' });
   const prompt = `Organize the Lab Link website for the user right now. Return only one JSON object with this exact shape:
 {
-  "workspace": "command|meetings|builder|projects|ai|integrations|settings",
+  "workspace": "command|experiments|meetings|builder|projects|ai|integrations|settings",
   "focusTitle": "short title for the top focus area",
   "focusBrief": "one concise sentence explaining what matters now",
   "orderedPanels": ["tasks","sections","meetings","risks","projects","integrations","ai","inbox"],
   "visiblePanels": ["focus","tasks","risks","sections","meetings","inbox","projects","ai","integrations"],
+  "orderedBlocks": ["priority-queue","experiment-readiness","meeting-studio","reagent-watch","project-health","risk-radar","calendar-pressure","integration-routes","ai-review","inbox-signals","custom-sections"],
+  "visibleBlocks": ["priority-queue","experiment-readiness","meeting-studio","reagent-watch","project-health","risk-radar","calendar-pressure","integration-routes","ai-review","inbox-signals","custom-sections"],
+  "collapsedBlocks": ["block ids that should start collapsed"],
+  "blockSubtabs": {"block-id":"preferred subtab id"},
   "collapsedPanels": ["panel ids that should start collapsed"],
   "pinnedSectionIds": ["custom section ids to emphasize"],
   "suggestedActions": ["short actions the user should consider"],
@@ -1000,12 +1030,15 @@ Current Lab Link state:
 ${labContextSummary(store)}
 
 Rules:
-- Keep the workspace minimal. Prefer 2 to 4 visible panels.
+- Keep the workspace useful but controlled. Prefer 4 to 6 visible blocks.
+- Use blocks as the primary layout contract; panel fields are retained for compatibility.
 - Hide or collapse anything not directly relevant to the intent.
 - Do not create new data or claim external sync happened.
-- If the intent is about meetings, include meetings and tasks.
-- If the intent is about setup, include integrations and sections.
-- If the intent is about execution, include focus, tasks, and risks only when risks matter.`;
+- If the intent is about experiments, include experiment-readiness, reagent-watch, risk-radar, and priority-queue.
+- If the intent is about meetings, include meeting-studio, priority-queue, ai-review, and calendar-pressure.
+- If the intent is about setup, include integration-routes and custom-sections.
+- If the intent is about execution, include priority-queue, project-health, and risk-radar when risks matter.
+- Pick subtabs from the block names only: priority-queue(today|blocked|waiting), experiment-readiness(protocols|samples|approvals), meeting-studio(agenda|transcript|actions), reagent-watch(stock|vendors|risks), project-health(active|at-risk|deadlines), risk-radar(open|mitigations|sources), calendar-pressure(upcoming|prep|deadlines), integration-routes(oauth|sync|publish), ai-review(suggestions|providers|runs), inbox-signals(actionable|collab|low-noise), custom-sections(installed|templates|ai-build).`;
   const result = await runAiText(
     store,
     'web.workspace.organize',
@@ -1349,6 +1382,8 @@ function runWebSmoke(args = []) {
   assert(js.includes('@motionone/dom'), 'client progressively loads Motion One');
   assert(js.includes('@floating-ui/dom'), 'client progressively loads Floating UI');
   assert(js.includes('sortablejs'), 'client progressively loads SortableJS');
+  assert(js.includes('BLOCK_REGISTRY'), 'client includes modular block registry');
+  assert(js.includes('blockSubtabs'), 'client persists block subtabs');
   assert(js.includes('/api/workspace/propose'), 'client can request provider-backed section proposals');
   assert(js.includes('/api/workspace/organize'), 'client can request provider-backed workspace organization');
   assert(js.includes('/api/integrations/oauth-url'), 'client can request integration OAuth URLs');
@@ -1373,6 +1408,8 @@ function runWebSmoke(args = []) {
   assert(section.title === 'Protocol Tracker', 'custom section sanitizer keeps title');
   const plan = sanitizeOrganizerPlan({ workspace: 'meetings', visiblePanels: ['focus', 'tasks', 'unknown'], collapsedPanels: ['risks'] });
   assert(plan.workspace === 'meetings' && plan.visiblePanels.length === 2, 'workspace organizer sanitizer works');
+  const blockPlan = sanitizeOrganizerPlan({ workspace: 'experiments', visibleBlocks: ['priority-queue', 'reagent-watch', 'unknown'], blockSubtabs: { 'reagent-watch': 'vendors' } });
+  assert(blockPlan.workspace === 'experiments' && blockPlan.visibleBlocks.length === 2 && blockPlan.blockSubtabs['reagent-watch'] === 'vendors', 'block organizer sanitizer works');
   const googleOauth = integrationOauthConfig('google', { GOOGLE_CLIENT_ID: 'client' });
   assert(googleOauth.authorizationUrl.includes('accounts.google.com'), 'google OAuth URL helper works');
   process.stdout.write('Web smoke passed.\n');

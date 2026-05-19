@@ -1,18 +1,33 @@
-const STORAGE_KEY = 'lablink.web.v2.4';
+const STORAGE_KEY = 'lablink.web.v2.7';
 
 const TABS = [
-  { id: 'command', label: 'Focus', key: '1' },
-  { id: 'meetings', label: 'Meetings', key: '2' },
-  { id: 'builder', label: 'Build', key: '3' },
+  { id: 'command', label: 'Command', key: '1' },
+  { id: 'experiments', label: 'Experiments', key: '2' },
+  { id: 'meetings', label: 'Meetings', key: '3' },
   { id: 'projects', label: 'Projects', key: '4' },
   { id: 'integrations', label: 'Integrations', key: '5' },
-  { id: 'ai', label: 'Review', key: '6' },
+  { id: 'builder', label: 'Build', key: '6' },
+  { id: 'ai', label: 'Review', key: '7' },
 ];
 
 const DEFAULT_PANEL_ORDER = ['tasks', 'sections', 'meetings', 'risks', 'projects', 'integrations', 'ai', 'inbox'];
+const DEFAULT_BLOCK_ORDER = [
+  'priority-queue',
+  'experiment-readiness',
+  'meeting-studio',
+  'reagent-watch',
+  'project-health',
+  'risk-radar',
+  'calendar-pressure',
+  'integration-routes',
+  'ai-review',
+  'inbox-signals',
+  'custom-sections',
+];
 
 const WORKSPACE_PRESETS = [
-  { id: 'command', label: 'Focus', intent: 'Focus on the few lab actions that matter today.' },
+  { id: 'command', label: 'Command', intent: 'Focus on the few lab actions that matter today.' },
+  { id: 'experiments', label: 'Experiments', intent: 'Organize experiment readiness, reagents, samples, approvals, and blockers.' },
   { id: 'meetings', label: 'Meeting', intent: 'Prepare or process the current meeting into tasks, risks, and follow-up.' },
   { id: 'builder', label: 'Build', intent: 'Create or adapt lab-specific sections for this workspace.' },
   { id: 'projects', label: 'Projects', intent: 'Review project status, owners, deadlines, and blockers.' },
@@ -55,6 +70,129 @@ const ROLE_PRESETS = [
   },
 ];
 
+const BLOCK_WORKSPACES = {
+  command: ['priority-queue', 'experiment-readiness', 'meeting-studio', 'reagent-watch', 'project-health', 'calendar-pressure'],
+  experiments: ['experiment-readiness', 'reagent-watch', 'risk-radar', 'priority-queue', 'calendar-pressure', 'custom-sections'],
+  meetings: ['meeting-studio', 'priority-queue', 'ai-review', 'calendar-pressure', 'inbox-signals', 'integration-routes'],
+  projects: ['project-health', 'priority-queue', 'risk-radar', 'calendar-pressure', 'inbox-signals', 'ai-review'],
+  integrations: ['integration-routes', 'meeting-studio', 'inbox-signals', 'ai-review', 'custom-sections'],
+  builder: ['custom-sections', 'experiment-readiness', 'reagent-watch', 'integration-routes'],
+  ai: ['ai-review', 'priority-queue', 'meeting-studio', 'inbox-signals', 'project-health'],
+};
+
+const BLOCK_REGISTRY = {
+  'priority-queue': {
+    title: 'Priority Queue',
+    domain: 'Execution',
+    size: 'large',
+    subtabs: [
+      { id: 'today', label: 'Today' },
+      { id: 'blocked', label: 'Blocked' },
+      { id: 'waiting', label: 'Waiting' },
+    ],
+  },
+  'experiment-readiness': {
+    title: 'Experiment Readiness',
+    domain: 'Wet Lab',
+    size: 'large',
+    subtabs: [
+      { id: 'protocols', label: 'Protocols' },
+      { id: 'samples', label: 'Samples' },
+      { id: 'approvals', label: 'Approvals' },
+    ],
+  },
+  'meeting-studio': {
+    title: 'Meeting Studio',
+    domain: 'Coordination',
+    size: 'large',
+    subtabs: [
+      { id: 'agenda', label: 'Agenda' },
+      { id: 'transcript', label: 'Transcript' },
+      { id: 'actions', label: 'Actions' },
+    ],
+  },
+  'reagent-watch': {
+    title: 'Reagent Watch',
+    domain: 'Supply',
+    size: 'medium',
+    subtabs: [
+      { id: 'stock', label: 'Stock' },
+      { id: 'vendors', label: 'Vendors' },
+      { id: 'risks', label: 'Risks' },
+    ],
+  },
+  'project-health': {
+    title: 'Project Health',
+    domain: 'Portfolio',
+    size: 'large',
+    subtabs: [
+      { id: 'active', label: 'Active' },
+      { id: 'at-risk', label: 'At Risk' },
+      { id: 'deadlines', label: 'Deadlines' },
+    ],
+  },
+  'risk-radar': {
+    title: 'Risk Radar',
+    domain: 'Controls',
+    size: 'medium',
+    subtabs: [
+      { id: 'open', label: 'Open' },
+      { id: 'mitigations', label: 'Mitigations' },
+      { id: 'sources', label: 'Sources' },
+    ],
+  },
+  'calendar-pressure': {
+    title: 'Calendar Pressure',
+    domain: 'Schedule',
+    size: 'medium',
+    subtabs: [
+      { id: 'upcoming', label: 'Upcoming' },
+      { id: 'prep', label: 'Prep' },
+      { id: 'deadlines', label: 'Deadlines' },
+    ],
+  },
+  'integration-routes': {
+    title: 'Integration Routes',
+    domain: 'Systems',
+    size: 'large',
+    subtabs: [
+      { id: 'oauth', label: 'OAuth' },
+      { id: 'sync', label: 'Sync' },
+      { id: 'publish', label: 'Publish' },
+    ],
+  },
+  'ai-review': {
+    title: 'AI Review',
+    domain: 'Review',
+    size: 'medium',
+    subtabs: [
+      { id: 'suggestions', label: 'Suggestions' },
+      { id: 'providers', label: 'Providers' },
+      { id: 'runs', label: 'Runs' },
+    ],
+  },
+  'inbox-signals': {
+    title: 'Inbox Signals',
+    domain: 'Messages',
+    size: 'medium',
+    subtabs: [
+      { id: 'actionable', label: 'Actionable' },
+      { id: 'collab', label: 'Collab' },
+      { id: 'low-noise', label: 'Low Noise' },
+    ],
+  },
+  'custom-sections': {
+    title: 'Custom Sections',
+    domain: 'Lab OS',
+    size: 'large',
+    subtabs: [
+      { id: 'installed', label: 'Installed' },
+      { id: 'templates', label: 'Templates' },
+      { id: 'ai-build', label: 'AI Build' },
+    ],
+  },
+};
+
 const DESIGN_LIBRARY_URLS = {
   motion: 'https://cdn.jsdelivr.net/npm/@motionone/dom@10.18.0/+esm',
   floating: 'https://cdn.jsdelivr.net/npm/@floating-ui/dom@1.7.4/+esm',
@@ -90,7 +228,9 @@ const state = {
   inspector: { open: false, mode: 'context', itemId: null },
   libraries: { loaded: false, motion: null, floating: null, sortable: null, status: 'fallback' },
   sortableInstance: null,
+  blockSortableInstance: null,
   panelOrder: [...DEFAULT_PANEL_ORDER],
+  blockOrder: [...DEFAULT_BLOCK_ORDER],
   visiblePanels: {
     focus: true,
     tasks: true,
@@ -102,7 +242,11 @@ const state = {
     ai: false,
     integrations: false,
   },
+  visibleBlocks: Object.fromEntries(DEFAULT_BLOCK_ORDER.map((id) => [id, true])),
   collapsedPanels: {},
+  collapsedBlocks: {},
+  blockSubtabs: {},
+  blockLoading: false,
   visibleModules: {},
   organizer: {
     intent: 'Help me focus on what matters for the lab today.',
@@ -153,6 +297,10 @@ function loadPrefs() {
     if (prefs.visiblePanels) state.visiblePanels = { ...state.visiblePanels, ...prefs.visiblePanels };
     if (prefs.collapsedPanels) state.collapsedPanels = prefs.collapsedPanels;
     if (Array.isArray(prefs.panelOrder)) state.panelOrder = normalizePanelOrder(prefs.panelOrder);
+    if (Array.isArray(prefs.blockOrder)) state.blockOrder = normalizeBlockOrder(prefs.blockOrder);
+    if (prefs.visibleBlocks) state.visibleBlocks = { ...state.visibleBlocks, ...prefs.visibleBlocks };
+    if (prefs.collapsedBlocks) state.collapsedBlocks = prefs.collapsedBlocks;
+    if (prefs.blockSubtabs) state.blockSubtabs = prefs.blockSubtabs;
     if (prefs.visibleModules) state.visibleModules = prefs.visibleModules;
   } catch {
     localStorage.removeItem(STORAGE_KEY);
@@ -170,6 +318,10 @@ function savePrefs() {
     visiblePanels: state.visiblePanels,
     collapsedPanels: state.collapsedPanels,
     panelOrder: state.panelOrder,
+    blockOrder: state.blockOrder,
+    visibleBlocks: state.visibleBlocks,
+    collapsedBlocks: state.collapsedBlocks,
+    blockSubtabs: state.blockSubtabs,
     visibleModules: state.visibleModules,
   }));
 }
@@ -194,6 +346,24 @@ function normalizePanelOrder(order) {
     if (!unique.includes(id)) unique.push(id);
   }
   return unique;
+}
+
+function normalizeBlockOrder(order) {
+  const valid = new Set(DEFAULT_BLOCK_ORDER);
+  const unique = order.filter((id, index) => valid.has(id) && order.indexOf(id) === index);
+  for (const id of DEFAULT_BLOCK_ORDER) {
+    if (!unique.includes(id)) unique.push(id);
+  }
+  return unique;
+}
+
+function blockById(id) {
+  return BLOCK_REGISTRY[id] || BLOCK_REGISTRY['priority-queue'];
+}
+
+function activeBlockSubtab(id) {
+  const block = blockById(id);
+  return block.subtabs.some((tab) => tab.id === state.blockSubtabs[id]) ? state.blockSubtabs[id] : block.subtabs[0].id;
 }
 
 function escapeHtml(value) {
@@ -391,16 +561,29 @@ function renderPanelChooser() {
 
 function renderMain() {
   return `
+    ${renderLabTabs()}
     ${renderCommandComposer()}
     ${state.organizer.plan ? renderOrganizerPlan() : ''}
     ${renderActiveView()}`;
 }
 
+function renderLabTabs() {
+  return `
+    <nav class="lab-tabs" aria-label="Lab workspace tabs" data-animate>
+      ${TABS.map((tab) => `
+        <button class="lab-tab ${state.activeTab === tab.id ? 'active' : ''}" type="button" data-tab="${tab.id}">
+          <span>${escapeHtml(tab.label)}</span>
+          <kbd>${escapeHtml(tab.key)}</kbd>
+        </button>
+      `).join('')}
+    </nav>`;
+}
+
 function renderCommandComposer() {
   return `
-    <section class="command-composer" data-animate>
+    <section class="command-composer block-composer ${state.organizer.busy ? 'is-working' : ''}" data-animate>
       <div>
-        <div class="eyebrow">Current Workspace</div>
+        <div class="eyebrow">Lab Blocks Runtime</div>
         <div class="workspace-pills">
           ${WORKSPACE_PRESETS.map((preset) => `
             <button class="workspace-pill ${state.activeTab === preset.id ? 'active' : ''}" type="button" data-tab="${preset.id}" title="${escapeHtml(preset.intent)}">${escapeHtml(preset.label)}</button>
@@ -409,14 +592,16 @@ function renderCommandComposer() {
       </div>
       <div class="composer-input-row">
         <textarea id="organizer-intent" rows="2">${escapeHtml(state.organizer.intent)}</textarea>
-        <button class="composer-submit" type="button" data-action="organize-workspace" ${state.organizer.busy ? 'disabled' : ''}>${state.organizer.busy ? 'Working' : 'Organize'}</button>
+        <button class="composer-submit" type="button" data-action="organize-workspace" ${state.organizer.busy ? 'disabled' : ''}>${state.organizer.busy ? 'Tuning' : 'Organize'}</button>
       </div>
       <div class="composer-meta">
-        <button class="text-action" type="button" data-action="focus-preset">Focus preset</button>
+        <button class="text-action" type="button" data-action="focus-preset">Focused blocks</button>
         <button class="text-action" type="button" data-action="everything-preset">Show more</button>
+        <button class="text-action" type="button" data-action="restore-blocks">Restore blocks</button>
         <button class="text-action" type="button" data-action="open-inspector" data-inspector-mode="integrations">Integrations</button>
         <span>${providerReady() ? 'Real provider configured' : 'Real AI provider required'}</span>
       </div>
+      ${state.organizer.busy ? `<div class="block-thinking"><span></span><span></span><span></span><strong>Rebuilding block layout</strong></div>` : ''}
     </section>`;
 }
 
@@ -438,11 +623,7 @@ function renderOrganizerPlan() {
 }
 
 function renderActiveView() {
-  if (state.activeTab === 'meetings') return renderMeetingStudio();
   if (state.activeTab === 'builder') return renderLabBuilder();
-  if (state.activeTab === 'projects') return renderProjects();
-  if (state.activeTab === 'ai') return renderAiReview();
-  if (state.activeTab === 'integrations') return renderIntegrations();
   if (state.activeTab === 'settings') return renderSettings();
   return renderCommand();
 }
@@ -478,51 +659,238 @@ function renderPanel(id, title, subtitle, content, actions = '') {
 
 function renderCommand() {
   const leadTask = state.data.tasks[0];
-  const customSections = state.data.customSections || [];
   const plan = state.organizer.plan;
-  const panels = {
-    tasks: () => renderPanel('tasks', 'Priority Queue', 'Work that should stay visible', `<div class="stream-list">${state.data.tasks.slice(0, 4).map(renderTask).join('')}</div>`),
-    sections: () => renderPanel('sections', 'Lab Sections', 'Custom surfaces for this lab', `<div class="section-flow">${customSections.slice(0, 4).map(renderCustomSection).join('') || '<div class="muted">No custom sections yet.</div>'}</div>`, '<button class="button compact" type="button" data-tab="builder">Build</button>'),
-    meetings: () => renderPanel('meetings', 'Meetings', 'Current coordination thread', `<div class="stream-list">${state.data.meetings.map(renderMeetingRow).join('')}</div>`, '<button class="button compact" type="button" data-tab="meetings">Studio</button>'),
-    risks: () => renderPanel('risks', 'Risk Radar', 'Blockers that change the plan', `<div class="stream-list">${state.data.risks.map(renderRisk).join('')}</div>`),
-    projects: () => renderPanel('projects', 'Projects', 'Portfolio summary', `<div class="section-flow">${state.data.projects.slice(0, 4).map(renderProjectMini).join('')}</div>`),
-    integrations: () => renderPanel('integrations', 'Integrations', 'External surfaces and setup state', `<div class="stream-list">${state.data.integrations.slice(0, 6).map(renderIntegrationMini).join('')}</div>`, '<button class="button compact" type="button" data-tab="integrations">Setup</button>'),
-    ai: () => renderPanel('ai', 'Review', 'Provider-backed suggestions', `<div class="stream-list">${state.data.aiSuggestions.slice(0, 4).map(renderSuggestion).join('')}</div>`),
-    inbox: () => renderPanel('inbox', 'Inbox', 'Messages worth converting into action', `<div class="stream-list">${state.data.inbox.map(renderInbox).join('')}</div>`),
-  };
+  const blocks = activeWorkspaceBlocks();
   return `
-    <section class="view-header minimal-header" data-animate>
-      <div>
-        <div class="eyebrow">Focus Canvas</div>
-        <h1>${escapeHtml(plan?.focusTitle || 'One workspace, selectively arranged')}</h1>
-        <p>${escapeHtml(plan?.focusBrief || 'Lab Link now hides the surface area you do not need and lets AI reorganize the workspace around the moment.')}</p>
+    <section class="block-hero" data-animate>
+      <div class="block-hero-main">
+        <div class="eyebrow">${escapeHtml(tabById(state.activeTab).label)} Workspace</div>
+        <h1>${escapeHtml(plan?.focusTitle || leadTask?.title || 'Lab work, organized in blocks')}</h1>
+        <p>${escapeHtml(plan?.focusBrief || leadTask?.reason || 'Each lab surface can be tuned manually or reorganized by a real AI provider.')}</p>
+      </div>
+      <div class="block-hero-metrics">
+        <span><strong>${state.data.counts.openTasks}</strong> tasks</span>
+        <span><strong>${state.data.counts.risks}</strong> risks</span>
+        <span><strong>${state.data.counts.pendingAi}</strong> reviews</span>
       </div>
       <div class="inline-actions">
-        <button class="button secondary" type="button" data-action="toggle-customize">${state.customize ? 'Done customizing' : 'Customize layout'}</button>
-        <button class="button primary" type="button" data-action="organize-workspace" ${state.organizer.busy ? 'disabled' : ''}>AI Organize</button>
+        <button class="button secondary" type="button" data-action="toggle-customize">${state.customize ? 'Done customizing' : 'Customize blocks'}</button>
+        <button class="button primary" type="button" data-action="organize-workspace" ${state.organizer.busy ? 'disabled' : ''}>Organize Blocks</button>
       </div>
     </section>
-    ${panelEnabled('focus') ? `
-      <section class="focus-canvas" data-animate>
-        <div>
-          <div class="eyebrow">Primary Focus</div>
-          <h2>${escapeHtml(leadTask?.title || 'No open task')}</h2>
-          <p>${escapeHtml(leadTask?.reason || 'The queue is clear.')}</p>
-          <div class="meta">
-            <span class="pill ${statusClass(leadTask?.priority)}">${escapeHtml(leadTask?.priority || 'clear')}</span>
-            <span>${escapeHtml(leadTask?.project || 'No project')}</span>
-            <span>${escapeHtml(leadTask?.assignee || 'Unassigned')}</span>
+    ${state.customize ? renderBlockChooser() : ''}
+    <div class="block-grid" data-sortable-blocks>
+      ${blocks.map((id) => renderLabBlock(id)).join('')}
+    </div>`;
+}
+
+function activeWorkspaceBlocks() {
+  const workspaceBlocks = BLOCK_WORKSPACES[state.activeTab] || BLOCK_WORKSPACES.command;
+  const allowed = new Set([...workspaceBlocks, ...DEFAULT_BLOCK_ORDER]);
+  return state.blockOrder
+    .filter((id) => allowed.has(id) && state.visibleBlocks[id] && workspaceBlocks.includes(id))
+    .concat(workspaceBlocks.filter((id) => state.visibleBlocks[id] && !state.blockOrder.includes(id)));
+}
+
+function renderBlockChooser() {
+  return `
+    <section class="block-customizer" data-animate>
+      <div>
+        <div class="eyebrow">Block Controls</div>
+        <h2>Choose what this lab surface shows</h2>
+      </div>
+      <div class="block-toggle-grid">
+        ${DEFAULT_BLOCK_ORDER.map((id) => `
+          <label class="block-toggle">
+            <input type="checkbox" data-block-visible="${escapeHtml(id)}" ${state.visibleBlocks[id] ? 'checked' : ''}>
+            <span>${escapeHtml(blockById(id).title)}</span>
+          </label>
+        `).join('')}
+      </div>
+    </section>`;
+}
+
+function renderLabBlock(id) {
+  const block = blockById(id);
+  const collapsed = Boolean(state.collapsedBlocks[id]);
+  const activeSubtab = activeBlockSubtab(id);
+  return `
+    <section class="lab-block ${block.size || 'medium'} ${state.blockLoading ? 'loading' : ''}" data-block="${escapeHtml(id)}" data-animate draggable="true">
+      <div class="lab-block-head">
+        <div class="panel-title-wrap">
+          <span class="drag-handle" title="Reorder">::</span>
+          <div>
+            <div class="eyebrow">${escapeHtml(block.domain)}</div>
+            <h2>${escapeHtml(block.title)}</h2>
           </div>
         </div>
-        <div class="focus-side">
-          <span>${state.data.counts.openTasks} tasks</span>
-          <span>${state.data.counts.risks} risks</span>
-          <span>${state.data.counts.pendingAi} reviews</span>
+        <div class="inline-actions">
+          <button class="button compact ghost" type="button" data-action="inspect-block" data-block-id="${escapeHtml(id)}">Inspect</button>
+          <button class="button compact ghost" type="button" data-action="collapse-block" data-block-id="${escapeHtml(id)}">${collapsed ? 'Open' : 'Close'}</button>
+          ${state.customize ? `<button class="button compact ghost" type="button" data-action="hide-block" data-block-id="${escapeHtml(id)}">Hide</button>` : ''}
         </div>
-      </section>` : ''}
-    <div class="surface-flow" data-sortable-panels>
-      ${state.panelOrder.map((id) => panels[id]?.() || '').join('')}
+      </div>
+      <div class="block-subtabs" role="tablist" aria-label="${escapeHtml(block.title)} subtabs">
+        ${block.subtabs.map((tab) => `
+          <button class="block-subtab ${activeSubtab === tab.id ? 'active' : ''}" type="button" data-action="block-subtab" data-block-id="${escapeHtml(id)}" data-subtab="${escapeHtml(tab.id)}">${escapeHtml(tab.label)}</button>
+        `).join('')}
+      </div>
+      ${collapsed ? '' : `<div class="lab-block-body">${renderBlockContent(id, activeSubtab)}</div>`}
+      ${state.blockLoading ? '<div class="block-loader"><span></span><span></span><span></span></div>' : ''}
+    </section>`;
+}
+
+function renderBlockContent(id, subtab) {
+  if (id === 'priority-queue') return renderPriorityBlock(subtab);
+  if (id === 'experiment-readiness') return renderExperimentBlock(subtab);
+  if (id === 'meeting-studio') return renderMeetingBlock(subtab);
+  if (id === 'reagent-watch') return renderReagentBlock(subtab);
+  if (id === 'project-health') return renderProjectBlock(subtab);
+  if (id === 'risk-radar') return renderRiskBlock(subtab);
+  if (id === 'calendar-pressure') return renderCalendarBlock(subtab);
+  if (id === 'integration-routes') return renderIntegrationBlock(subtab);
+  if (id === 'ai-review') return renderAiBlock(subtab);
+  if (id === 'inbox-signals') return renderInboxBlock(subtab);
+  if (id === 'custom-sections') return renderCustomSectionsBlock(subtab);
+  return '<div class="muted small">Block is not configured.</div>';
+}
+
+function renderPriorityBlock(subtab) {
+  const tasks = state.data.tasks.filter((task) => {
+    if (subtab === 'blocked') return task.status === 'blocked' || task.priority === 'critical';
+    if (subtab === 'waiting') return !task.due || task.priority === 'low';
+    return task.due || ['critical', 'high'].includes(task.priority);
+  });
+  return `<div class="block-list">${tasks.slice(0, 5).map(renderTask).join('') || '<div class="muted small">No matching tasks.</div>'}</div>`;
+}
+
+function renderExperimentBlock(subtab) {
+  const section = state.data.customSections?.find((item) => /reagent|protocol|readiness/i.test(`${item.title} ${item.module}`));
+  if (subtab === 'samples') {
+    return `
+      <div class="lab-matrix">
+        <div><span>Cohort</span><strong>Cohort 2</strong><em>Perfusion window pending</em></div>
+        <div><span>Imaging</span><strong>Core booking</strong><em>${escapeHtml(state.data.calendarEvents[1]?.prep || 'Booking review needed')}</em></div>
+        <div><span>Analysis</span><strong>Open field</strong><em>Due ${escapeHtml(formatDate(state.data.tasks.find((task) => /open field/i.test(task.title))?.due))}</em></div>
+      </div>`;
+  }
+  if (subtab === 'approvals') {
+    return `
+      <div class="block-list">
+        ${state.data.risks.slice(0, 3).map(renderRisk).join('')}
+        <article class="queue-item"><div class="queue-title">Protocol readiness review</div><p class="muted small">Use Lab Builder to add approval, IACUC, IRB, training, or equipment sign-off fields for this lab.</p></article>
+      </div>`;
+  }
+  return `
+    <div class="block-list">
+      ${section ? renderCustomSection(section) : '<article class="queue-item"><div class="queue-title">Protocol readiness</div><p class="muted small">No protocol section installed yet.</p></article>'}
+      ${state.data.tasks.filter((task) => /schedule|confirm|run/i.test(task.title)).slice(0, 3).map(renderTask).join('')}
     </div>`;
+}
+
+function renderMeetingBlock(subtab) {
+  if (subtab === 'transcript') {
+    return `
+      <div class="field compact-field">
+        <textarea id="meeting-transcript" class="transcript">${escapeHtml(state.meeting.transcript)}</textarea>
+      </div>
+      <div class="inline-actions"><button class="button compact" type="button" data-action="run-rules">Run Rules</button><button class="button compact primary" type="button" data-action="run-ai">Analyze</button></div>`;
+  }
+  if (subtab === 'actions') {
+    return state.meeting.rules ? `<div class="rules-grid">${renderRulesBucket('Tasks', state.meeting.rules.tasks)}${renderRulesBucket('Decisions', state.meeting.rules.decisions)}${renderRulesBucket('Risks', state.meeting.rules.risks)}</div>` : '<div class="muted small">Rules pass has not completed yet.</div>';
+  }
+  return `
+    <div class="field compact-field">
+      <textarea id="meeting-agenda">${escapeHtml(state.meeting.agenda)}</textarea>
+    </div>
+    <div class="inline-actions">
+      <button class="button compact" type="button" data-action="start-zoom" ${state.meeting.busy ? 'disabled' : ''}>Start Zoom</button>
+      <button class="button compact ${state.meeting.live ? 'danger' : 'secondary'}" type="button" data-action="${state.meeting.live ? 'stop-live' : 'start-live'}">${state.meeting.live ? 'Stop Live' : 'Live Notes'}</button>
+    </div>`;
+}
+
+function renderReagentBlock(subtab) {
+  const reagentSignals = (state.data.customSections || []).flatMap((section) => section.signals || []);
+  if (subtab === 'vendors') {
+    return `
+      <div class="lab-matrix">
+        <div><span>Primary</span><strong>Thermo</strong><em>Backorder risk</em></div>
+        <div><span>Alternate</span><strong>CST</strong><em>Clone check assigned</em></div>
+        <div><span>Decision</span><strong>Vendor substitute</strong><em>Owner Jordan</em></div>
+      </div>`;
+  }
+  if (subtab === 'risks') return `<div class="block-list">${state.data.risks.filter((risk) => /AT8|reagent|antibody/i.test(risk.title)).map(renderRisk).join('') || '<div class="muted small">No reagent risks found.</div>'}</div>`;
+  return `
+    <div class="block-list">
+      ${(reagentSignals.length ? reagentSignals : ['AT8 antibody supply needs review.']).slice(0, 4).map((item) => `<article class="queue-item"><div class="queue-title">${escapeHtml(item)}</div><p class="muted small">Source: custom lab section or meeting extraction.</p></article>`).join('')}
+    </div>`;
+}
+
+function renderProjectBlock(subtab) {
+  let projects = state.data.projects;
+  if (subtab === 'at-risk') projects = projects.filter((project) => /risk|watch/i.test(project.status));
+  if (subtab === 'deadlines') projects = [...projects].sort((a, b) => String(a.nextDeadline || '').localeCompare(String(b.nextDeadline || '')));
+  return `<div class="block-list project-block-list">${projects.slice(0, 4).map(renderProjectMini).join('')}</div>`;
+}
+
+function renderRiskBlock(subtab) {
+  if (subtab === 'sources') {
+    return `<div class="block-list">${state.data.aiSuggestions.filter((item) => item.type === 'risk').map(renderSuggestion).join('') || '<div class="muted small">No risk suggestions pending.</div>'}</div>`;
+  }
+  if (subtab === 'mitigations') {
+    return `<div class="lab-matrix">${state.data.risks.map((risk) => `<div><span>${escapeHtml(risk.severity)}</span><strong>${escapeHtml(risk.title)}</strong><em>${escapeHtml(risk.mitigation)}</em></div>`).join('')}</div>`;
+  }
+  return `<div class="block-list">${state.data.risks.map(renderRisk).join('')}</div>`;
+}
+
+function renderCalendarBlock(subtab) {
+  if (subtab === 'deadlines') {
+    return `<div class="block-list">${state.data.projects.slice(0, 4).map((project) => `<article class="queue-item mini-row"><div><div class="queue-title">${escapeHtml(project.name)}</div><div class="muted small">${escapeHtml(project.health)}</div></div><span class="pill">${escapeHtml(formatDate(project.nextDeadline))}</span></article>`).join('')}</div>`;
+  }
+  const events = state.data.calendarEvents || [];
+  return `<div class="block-list">${events.map((event) => `<article class="queue-item mini-row"><div><div class="queue-title">${escapeHtml(event.title)}</div><div class="muted small">${escapeHtml(subtab === 'prep' ? event.prep : formatTime(event.at))}</div></div><span class="pill">${event.durationMinutes}m</span></article>`).join('')}</div>`;
+}
+
+function renderIntegrationBlock(subtab) {
+  const items = state.data.integrations || [];
+  if (subtab === 'publish') {
+    return `<div class="block-list">${items.filter((item) => ['slack', 'notion', 'whatsapp'].includes(item.id)).map(renderIntegrationMini).join('')}</div>`;
+  }
+  if (subtab === 'sync') {
+    return `<div class="block-list">${items.filter((item) => ['google', 'microsoft', 'zoom'].includes(item.id)).map(renderIntegrationMini).join('')}</div>`;
+  }
+  return `<div class="block-list">${items.slice(0, 6).map((item) => `<article class="queue-item mini-row"><div><div class="queue-title">${escapeHtml(item.label)}</div><div class="muted small">${escapeHtml(item.nextStep)}</div></div><button class="button compact" type="button" data-action="integration-oauth" data-provider="${escapeHtml(item.id)}">OAuth</button></article>`).join('')}</div>`;
+}
+
+function renderAiBlock(subtab) {
+  if (subtab === 'providers') return `<div class="block-list">${state.data.providers.map(renderProvider).join('')}</div>`;
+  if (subtab === 'runs') return `<div class="block-list">${(state.data.aiRuns || []).map((run) => `<article class="queue-item"><div class="queue-title">${escapeHtml(run.feature || run.action || 'AI run')}</div><p class="muted small">${escapeHtml(run.at || run.createdAt || 'No timestamp')}</p></article>`).join('') || '<div class="muted small">No provider runs recorded in this beta workspace.</div>'}</div>`;
+  return `<div class="block-list">${state.data.aiSuggestions.slice(0, 5).map(renderSuggestion).join('')}</div>`;
+}
+
+function renderInboxBlock(subtab) {
+  let items = state.data.inbox || [];
+  if (subtab === 'actionable') items = items.filter((item) => item.confidence >= 0.8 || item.unread);
+  if (subtab === 'collab') items = items.filter((item) => /collab|discuss|review/i.test(`${item.subject} ${item.preview}`));
+  if (subtab === 'low-noise') items = items.filter((item) => item.confidence < 0.8);
+  return `<div class="block-list">${items.map(renderInbox).join('') || '<div class="muted small">No matching messages.</div>'}</div>`;
+}
+
+function renderCustomSectionsBlock(subtab) {
+  if (subtab === 'templates') {
+    return `
+      <div class="lab-matrix">
+        <div><span>Wet lab</span><strong>Protocol Readiness</strong><em>Approvals, samples, owners</em></div>
+        <div><span>Core facility</span><strong>Equipment Booking</strong><em>Slots, users, prep</em></div>
+        <div><span>Grant</span><strong>Deadline Control</strong><em>Aims, figures, routing</em></div>
+      </div>`;
+  }
+  if (subtab === 'ai-build') {
+    return `
+      <div class="field compact-field"><textarea id="builder-goal">${escapeHtml(state.builder.goal)}</textarea></div>
+      <button class="button compact primary" type="button" data-action="propose-section" ${state.builder.busy ? 'disabled' : ''}>Generate Section</button>`;
+  }
+  return `<div class="section-flow">${(state.data.customSections || []).slice(0, 4).map(renderCustomSection).join('') || '<div class="muted small">No custom sections installed.</div>'}</div>`;
 }
 
 function renderTask(task) {
@@ -1027,6 +1395,8 @@ function renderContextInspector() {
   return `
     <div class="inspector-stack">
       <div class="inspector-line"><span>Visible panels</span><strong>${Object.values(state.visiblePanels).filter(Boolean).length}</strong></div>
+      <div class="inspector-line"><span>Visible blocks</span><strong>${Object.values(state.visibleBlocks).filter(Boolean).length}</strong></div>
+      ${state.inspector.itemId && BLOCK_REGISTRY[state.inspector.itemId] ? `<div class="inspector-line"><span>Selected block</span><strong>${escapeHtml(BLOCK_REGISTRY[state.inspector.itemId].title)}</strong></div>` : ''}
       <div class="inspector-line"><span>Custom sections</span><strong>${state.data.customSections?.length || 0}</strong></div>
       <div class="inspector-line"><span>Interaction mode</span><strong>${escapeHtml(state.libraries.status)}</strong></div>
       <div class="inspector-copy">${escapeHtml(state.organizer.plan?.reasoning || 'No provider-backed layout plan has been applied in this session.')}</div>
@@ -1198,6 +1568,26 @@ function applyOrganizerPlan(plan) {
   state.organizer.plan = plan;
   state.activeTab = plan.workspace || 'command';
   if (Array.isArray(plan.orderedPanels)) state.panelOrder = normalizePanelOrder(plan.orderedPanels);
+  if (Array.isArray(plan.orderedBlocks)) state.blockOrder = normalizeBlockOrder(plan.orderedBlocks);
+  if (Array.isArray(plan.visibleBlocks) && plan.visibleBlocks.length) {
+    const nextBlocks = Object.fromEntries(DEFAULT_BLOCK_ORDER.map((id) => [id, false]));
+    for (const id of plan.visibleBlocks) {
+      if (id in nextBlocks) nextBlocks[id] = true;
+    }
+    state.visibleBlocks = nextBlocks;
+  }
+  if (Array.isArray(plan.collapsedBlocks)) {
+    state.collapsedBlocks = {};
+    for (const id of plan.collapsedBlocks) {
+      if (id in BLOCK_REGISTRY) state.collapsedBlocks[id] = true;
+    }
+  }
+  if (plan.blockSubtabs && typeof plan.blockSubtabs === 'object') {
+    for (const [id, subtab] of Object.entries(plan.blockSubtabs)) {
+      const block = BLOCK_REGISTRY[id];
+      if (block?.subtabs.some((item) => item.id === subtab)) state.blockSubtabs[id] = subtab;
+    }
+  }
   const nextVisible = {};
   for (const key of Object.keys(PANEL_LABELS)) nextVisible[key] = false;
   for (const key of plan.visiblePanels || ['focus', 'tasks', 'sections']) {
@@ -1283,6 +1673,7 @@ async function organizeWorkspace() {
     return;
   }
   state.organizer.busy = 'organizing';
+  state.blockLoading = true;
   render();
   try {
     const result = await api('/api/workspace/organize', {
@@ -1296,6 +1687,7 @@ async function organizeWorkspace() {
     state.toast = `${error.message}${required}`;
   } finally {
     state.organizer.busy = null;
+    state.blockLoading = false;
     render();
   }
 }
@@ -1306,7 +1698,10 @@ function applyFocusPreset() {
     focusTitle: 'Execution focus',
     focusBrief: 'Showing only the primary focus, next tasks, and custom lab sections.',
     visiblePanels: ['focus', 'tasks', 'sections'],
+    orderedBlocks: ['priority-queue', 'experiment-readiness', 'meeting-studio', 'reagent-watch', 'project-health', 'calendar-pressure'],
+    visibleBlocks: ['priority-queue', 'experiment-readiness', 'meeting-studio', 'reagent-watch'],
     collapsedPanels: [],
+    collapsedBlocks: [],
     suggestedActions: ['Work top task', 'Review custom section', 'Open context only if needed'],
   });
   state.toast = 'Focus preset applied.';
@@ -1316,7 +1711,9 @@ function applyFocusPreset() {
 function applyEverythingPreset() {
   state.activeTab = 'command';
   state.visiblePanels = Object.fromEntries(Object.keys(PANEL_LABELS).map((key) => [key, true]));
+  state.visibleBlocks = Object.fromEntries(DEFAULT_BLOCK_ORDER.map((key) => [key, true]));
   state.collapsedPanels = { risks: true, inbox: true, projects: true, ai: true, integrations: true };
+  state.collapsedBlocks = { 'inbox-signals': true, 'ai-review': true, 'integration-routes': true };
   state.organizer.plan = {
     focusTitle: 'Full workspace',
     focusBrief: 'Everything is available, with secondary panels collapsed to reduce visual load.',
@@ -1336,13 +1733,23 @@ function applyRolePreset(id) {
     focusTitle: preset.label,
     focusBrief: preset.intent,
     orderedPanels: DEFAULT_PANEL_ORDER,
+    orderedBlocks: DEFAULT_BLOCK_ORDER,
     visiblePanels: preset.panels,
+    visibleBlocks: roleToBlocks(preset.id),
     collapsedPanels: preset.collapsed,
+    collapsedBlocks: preset.id === 'pi' ? ['ai-review'] : preset.id === 'lab-manager' ? ['integration-routes'] : [],
     suggestedActions: preset.actions,
     reasoning: `Applied ${preset.label} local role preset.`,
   });
   state.toast = `${preset.label} layout applied.`;
   render();
+}
+
+function roleToBlocks(id) {
+  if (id === 'pi') return ['priority-queue', 'project-health', 'risk-radar', 'calendar-pressure', 'ai-review'];
+  if (id === 'lab-manager') return ['priority-queue', 'experiment-readiness', 'reagent-watch', 'risk-radar', 'integration-routes'];
+  if (id === 'computational') return ['priority-queue', 'project-health', 'calendar-pressure', 'inbox-signals', 'ai-review'];
+  return ['priority-queue', 'experiment-readiness', 'meeting-studio', 'custom-sections'];
 }
 
 async function proposeSection() {
@@ -1529,6 +1936,17 @@ function handleClick(event) {
     state.inspector = { open: true, mode: trigger.dataset.panelId === 'integrations' ? 'integrations' : trigger.dataset.panelId === 'ai' ? 'ai' : 'context', itemId: trigger.dataset.panelId };
     render();
   }
+  if (action === 'inspect-block') {
+    const trigger = event.target.closest('[data-block-id]');
+    state.inspector = { open: true, mode: trigger.dataset.blockId === 'integration-routes' ? 'integrations' : trigger.dataset.blockId === 'ai-review' ? 'ai' : 'context', itemId: trigger.dataset.blockId };
+    render();
+  }
+  if (action === 'block-subtab') {
+    const trigger = event.target.closest('[data-block-id]');
+    state.blockSubtabs[trigger.dataset.blockId] = trigger.dataset.subtab;
+    savePrefs();
+    render();
+  }
   if (action === 'integration-oauth') createIntegrationOauthUrl(event.target.closest('[data-provider]')?.dataset.provider);
   if (action === 'oauth-exchange') exchangeOauthCode(event.target.closest('[data-provider]')?.dataset.provider);
   if (action === 'zoom-refresh') refreshZoomToken();
@@ -1539,6 +1957,13 @@ function handleClick(event) {
   if (action === 'organize-workspace') organizeWorkspace();
   if (action === 'focus-preset') applyFocusPreset();
   if (action === 'everything-preset') applyEverythingPreset();
+  if (action === 'restore-blocks') {
+    state.visibleBlocks = Object.fromEntries(DEFAULT_BLOCK_ORDER.map((id) => [id, true]));
+    state.collapsedBlocks = {};
+    state.blockOrder = [...DEFAULT_BLOCK_ORDER];
+    savePrefs();
+    render();
+  }
   if (action === 'role-preset') applyRolePreset(event.target.closest('[data-role]')?.dataset.role);
   if (action === 'toggle-customize') {
     state.customize = !state.customize;
@@ -1580,6 +2005,18 @@ function handleClick(event) {
     savePrefs();
     render();
   }
+  if (action === 'collapse-block') {
+    const id = event.target.closest('[data-block-id]').dataset.blockId;
+    state.collapsedBlocks[id] = !state.collapsedBlocks[id];
+    savePrefs();
+    render();
+  }
+  if (action === 'hide-block') {
+    const id = event.target.closest('[data-block-id]').dataset.blockId;
+    state.visibleBlocks[id] = false;
+    savePrefs();
+    render();
+  }
   if (action === 'run-rules') runRules();
   if (action === 'run-ai') runAiAnalysis();
   if (action === 'start-zoom') startZoom();
@@ -1592,6 +2029,7 @@ function handleClick(event) {
   if (action === 'reset-tabs') {
     state.tabOrder = TABS.map((tab) => tab.id);
     state.panelOrder = [...DEFAULT_PANEL_ORDER];
+    state.blockOrder = [...DEFAULT_BLOCK_ORDER];
     savePrefs();
     render();
   }
@@ -1615,6 +2053,10 @@ function handleClick(event) {
       integrations: false,
     };
     state.collapsedPanels = {};
+    state.visibleBlocks = Object.fromEntries(DEFAULT_BLOCK_ORDER.map((id) => [id, true]));
+    state.collapsedBlocks = {};
+    state.blockOrder = [...DEFAULT_BLOCK_ORDER];
+    state.blockSubtabs = {};
     state.visibleModules = { ...(state.data.featureFlags || {}) };
     render();
   }
@@ -1669,9 +2111,22 @@ function handleInput(event) {
     savePrefs();
     render();
   }
+  if (event.target.matches('[data-block-visible]')) {
+    state.visibleBlocks[event.target.dataset.blockVisible] = event.target.checked;
+    savePrefs();
+    render();
+  }
 }
 
 function handleDragStart(event) {
+  const block = event.target.closest('[data-block]');
+  if (block) {
+    dragTabId = `block:${block.dataset.block}`;
+    block.classList.add('dragging');
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', dragTabId);
+    return;
+  }
   const panel = event.target.closest('[data-panel]');
   if (panel) {
     dragTabId = `panel:${panel.dataset.panel}`;
@@ -1689,6 +2144,8 @@ function handleDragStart(event) {
 }
 
 function handleDragEnd(event) {
+  const block = event.target.closest('[data-block]');
+  if (block) block.classList.remove('dragging');
   const panel = event.target.closest('[data-panel]');
   if (panel) panel.classList.remove('dragging');
   const tab = event.target.closest('[data-tab]');
@@ -1697,10 +2154,24 @@ function handleDragEnd(event) {
 }
 
 function handleDragOver(event) {
-  if (event.target.closest('.workspace-tab') || event.target.closest('[data-panel]')) event.preventDefault();
+  if (event.target.closest('.workspace-tab') || event.target.closest('[data-panel]') || event.target.closest('[data-block]')) event.preventDefault();
 }
 
 function handleDrop(event) {
+  const blockTarget = event.target.closest('[data-block]');
+  if (blockTarget && dragTabId?.startsWith('block:')) {
+    event.preventDefault();
+    const source = dragTabId.replace('block:', '');
+    const target = blockTarget.dataset.block;
+    if (source !== target) {
+      const next = state.blockOrder.filter((id) => id !== source);
+      next.splice(next.indexOf(target), 0, source);
+      state.blockOrder = normalizeBlockOrder(next);
+      savePrefs();
+      render();
+    }
+    return;
+  }
   const panelTarget = event.target.closest('[data-panel]');
   if (panelTarget && dragTabId?.startsWith('panel:')) {
     event.preventDefault();
@@ -1738,6 +2209,20 @@ function afterRender() {
     });
   }
   const Sortable = state.libraries.sortable;
+  const blockContainer = document.querySelector('[data-sortable-blocks]');
+  if (Sortable && blockContainer && !blockContainer.dataset.sortableReady) {
+    blockContainer.dataset.sortableReady = 'true';
+    state.blockSortableInstance?.destroy?.();
+    state.blockSortableInstance = Sortable.create(blockContainer, {
+      animation: 220,
+      handle: '.drag-handle',
+      ghostClass: 'drag-ghost',
+      onEnd: () => {
+        state.blockOrder = normalizeBlockOrder([...blockContainer.querySelectorAll('[data-block]')].map((item) => item.dataset.block));
+        savePrefs();
+      },
+    });
+  }
   const container = document.querySelector('[data-sortable-panels]');
   if (Sortable && container && !container.dataset.sortableReady) {
     container.dataset.sortableReady = 'true';

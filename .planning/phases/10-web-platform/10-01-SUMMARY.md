@@ -16,6 +16,7 @@ Status: Complete
 - Replaced the tab-heavy main surface with one workspace selector, a compact AI organizer, and customizable visible/collapsed panels.
 - Added a real-provider workspace organizer route that can choose workspace mode, focus copy, visible panels, collapsed panels, pinned sections, and suggested actions.
 - Added the v2.6 refined interaction PRD and implemented the next shell pass: command composer, focus canvas, adaptive sections, role presets, inspector sheet, progressive Motion/Floating UI/Sortable loading, guided integration surfaces, OAuth URL helper, OAuth authorization-code exchange, and Zoom refresh helper.
+- Added PRD v2.7 and implemented the modular Lab Blocks Runtime: workspace tabs, typed block registry, draggable blocks, per-block subtabs, animated organize loading, and AI block layout schema.
 - Added beta packaging coverage for the website and web smoke checks.
 
 ## Verification
@@ -39,6 +40,7 @@ Status: Complete
 - The third refinement removed persistent screen tabs and made AI act on the current workspace instead of living only in a separate AI page.
 - The fourth refinement removed primary native dropdown navigation and reduced the display to an app workspace: command, focus, adaptive sections, role presets, and temporary inspector.
 - The fifth refinement replaced the last native density select and visible design-explainer block, then added real OAuth code exchange for Zoom, Google, and Microsoft.
+- The sixth refinement restored modular blocks and subtabs while keeping real-provider-only AI customization.
 
 ## Next
 
