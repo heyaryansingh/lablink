@@ -18,6 +18,11 @@ import './blocks/lab-team-coordination.js';
 import './blocks/lab-grant-milestones.js';
 import './blocks/lab-risk-radar.js';
 import './blocks/lab-data-pipeline.js';
+import './blocks/lab-project-health.js';
+import './blocks/lab-calendar-pressure.js';
+import './blocks/lab-integration-routes.js';
+import './blocks/lab-inbox-signals.js';
+import './blocks/lab-custom-sections.js';
 
 /**
  * Lab Link V3 Application
