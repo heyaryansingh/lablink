@@ -78,9 +78,28 @@ Current V3 foundation completion promises:
 - The v2.7 browser restores the modular block design: workspace tabs, draggable lab blocks, per-block subtabs, animated organize loading, AI-controlled block plans, and manual block controls.
 - The v2.8 repo guard adds `lablink repo scan` and npm scripts to detect outside edits, classify risk, and run syntax/web/full validation without destructive git operations.
 
+## V3 Implementation Progress
+
+**Phase 1 Foundation:** ✅ COMPLETE
+- Design system, animations, event bus
+- LabBlock base component
+- Block registry with 17 manifests
+- Streaming AI (frontend + backend)
+
+**Phase 2 Core Blocks:** ⏳ STARTED
+- Priority Queue: Started
+- Meeting Studio: Pending
+- Experiment Readiness: Pending
+- AI Review: Pending
+
+See `docs/superpowers/V3_CONTINUATION.md` for detailed status and next steps.
+
 ## Next Actions
 
-- Start the local web server for browser review.
-- Publish the beta after a final `npm run release:check` in the release environment.
-- Continue full OAuth callbacks, token storage hardening, AI-generated section editing, saved layout presets, richer meeting-to-execution publishing, and deeper lab ontology modeling.
-- Run `npm run repo:scan` after any external Claude/developer change before building on top of it.
+- Continue V3 Phase 2: Implement core blocks (Meeting Studio, Experiment Readiness, AI Review)
+- Integrate V3 blocks into main app (create app-v3.js)
+- Test streaming AI with real interactions
+- Complete remaining phases 3-7 (lab features, coordination, integrations, polish)
+- Start the local web server for browser review
+- Publish V3 beta after comprehensive testing
+- Run `npm run repo:scan` after any external Claude/developer change before building on top of it
