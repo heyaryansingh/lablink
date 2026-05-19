@@ -44,11 +44,13 @@ lablink schedule plan --ai
 lablink automation run --ai
 ```
 
+Copy `.env.example` when setting up a local developer environment; the web runtime can also load tokens from the ignored `.lablink-dev/secrets.json` file.
+
 Anthropic is also supported through `ANTHROPIC_API_KEY`. Local or custom OpenAI-compatible endpoints can be configured with `lablink config set ai.local.baseUrl <url>` or `lablink config set ai.custom.baseUrl <url>`.
 
 Website meeting analysis uses the same real-provider policy. Meeting Studio can run local rules-based extraction without an AI key, but the "Analyze With Real AI" action requires a real provider and fails with setup guidance if none is configured.
 
-Zoom meeting creation also requires real credentials. For the beta route, set `ZOOM_ACCESS_TOKEN` before using the website Start Zoom action. Lab Link does not fabricate meeting links when Zoom is not configured.
+Zoom meeting creation also requires real credentials. For the beta route, set `ZOOM_ACCESS_TOKEN` before using the website Start Zoom action. The website can also generate OAuth consent URLs and exchange returned authorization codes for Zoom, Google Workspace, and Microsoft Graph when the matching client credentials and redirect URI are configured. Lab Link does not fabricate meeting links when Zoom is not configured.
 
 ## Current State
 
@@ -91,11 +93,11 @@ node bin/lablink.mjs web --port 4867
 The bootstrap runtime includes Command Center, Today, Projects, Meetings, AI Review, Settings, transcript import, rules-based review suggestions, AI suggestion approve/reject commands, and a local browser workspace.
 Transcript import and default schedule/progress flows use labeled rules-based automation unless you run the `--ai` provider-backed commands.
 
-The browser workspace includes a compact command rail, a single workspace selector, an optional intelligence rail, Meeting Studio, browser live-note capture when supported, rules-based meeting extraction, real-provider meeting analysis, Zoom creation setup, integration status, and layout preferences saved in browser storage.
+The browser workspace includes a command composer, focus canvas, adaptive sections, role presets, optional inspector sheet, Meeting Studio, browser live-note capture when supported, rules-based meeting extraction, real-provider meeting analysis, Zoom creation setup, OAuth URL/code-exchange helpers, and layout preferences saved in browser storage.
 
 The web beta also includes Lab Builder, an adaptive workspace composer. It can save local custom lab sections manually, or use a configured real AI provider to propose new section designs for things like reagent tracking, protocol readiness, equipment coordination, grants, onboarding, or lab-specific review queues. Provider-backed section generation fails with setup guidance if no real AI provider is configured.
 
-The workspace can also be reorganized by AI from the left command rail. Describe the current intent, run AI Organize, and Lab Link selects the workspace, visible panels, collapsed panels, focus title, and suggested actions. This is provider-backed only; no local fake AI layout is returned.
+The workspace can also be reorganized by AI from the command composer. Describe the current intent, run Organize, and Lab Link selects the workspace, section order, visible sections, collapsed sections, focus title, and suggested actions. This is provider-backed only; no local fake AI layout is returned. Motion One, Floating UI, and SortableJS load progressively in the browser when available; native fallback behavior remains.
 
 Run the full package release check before publishing:
 

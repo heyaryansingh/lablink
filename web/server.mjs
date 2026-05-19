@@ -75,13 +75,23 @@ function loadLocalSecrets(dataDir, args = []) {
     'LABLINK_CUSTOM_AI_MODEL',
     'LABLINK_CUSTOM_AI_KEY',
     'LABLINK_CUSTOM_AI_KEY_ENV',
+    'LABLINK_OAUTH_REDIRECT_URI',
     'ZOOM_ACCESS_TOKEN',
+    'ZOOM_REFRESH_TOKEN',
     'ZOOM_CLIENT_ID',
     'ZOOM_CLIENT_SECRET',
+    'ZOOM_REDIRECT_URI',
     'GOOGLE_CLIENT_ID',
     'GOOGLE_CLIENT_SECRET',
+    'GOOGLE_ACCESS_TOKEN',
+    'GOOGLE_REFRESH_TOKEN',
+    'GOOGLE_REDIRECT_URI',
     'MICROSOFT_CLIENT_ID',
     'MICROSOFT_CLIENT_SECRET',
+    'MICROSOFT_ACCESS_TOKEN',
+    'MICROSOFT_REFRESH_TOKEN',
+    'MICROSOFT_TENANT_ID',
+    'MICROSOFT_REDIRECT_URI',
     'SLACK_BOT_TOKEN',
     'NOTION_TOKEN',
     'WHATSAPP_ACCESS_TOKEN',
@@ -93,6 +103,13 @@ function loadLocalSecrets(dataDir, args = []) {
     if (typeof source[key] === 'string' && source[key].trim()) values[key] = source[key].trim();
   }
   return { file, values };
+}
+
+function writeLocalSecrets(file, updates) {
+  const existing = readJson(file, {});
+  const next = { ...existing, ...updates };
+  writeJson(file, next);
+  return next;
 }
 
 function runtimeEnv(dataDir, args = []) {
@@ -420,10 +437,12 @@ function sanitizeOrganizerPlan(input = {}) {
   const workspace = allowedWorkspaces.has(input.workspace) ? input.workspace : 'command';
   const visiblePanels = sanitizeList(input.visiblePanels, 8, 40).filter((panel) => allowedPanels.has(panel));
   const collapsedPanels = sanitizeList(input.collapsedPanels, 8, 40).filter((panel) => allowedPanels.has(panel));
+  const orderedPanels = sanitizeList(input.orderedPanels, 10, 40).filter((panel) => allowedPanels.has(panel));
   return {
     workspace,
     focusTitle: sanitizeString(input.focusTitle, 'Lab focus', 90),
     focusBrief: sanitizeString(input.focusBrief, 'Review the highest-leverage work and hide the rest until needed.', 260),
+    orderedPanels: orderedPanels.length ? orderedPanels : visiblePanels.length ? visiblePanels : ['tasks', 'sections', 'meetings', 'risks', 'projects', 'integrations', 'ai', 'inbox'],
     visiblePanels: visiblePanels.length ? visiblePanels : ['focus', 'tasks', 'sections'],
     collapsedPanels,
     pinnedSectionIds: sanitizeList(input.pinnedSectionIds, 8, 80),
@@ -472,19 +491,19 @@ function integrationStatuses(env = process.env) {
       id: 'microsoft',
       label: 'Microsoft Graph',
       surface: 'Outlook mail, Outlook calendar, OneDrive',
-      status: envStatus(env, 'MICROSOFT_CLIENT_ID') ? 'configured' : 'not configured',
-      required: ['MICROSOFT_CLIENT_ID', 'MICROSOFT_CLIENT_SECRET'],
+      status: envStatus(env, 'MICROSOFT_ACCESS_TOKEN') ? 'ready' : envStatus(env, 'MICROSOFT_CLIENT_ID') ? 'oauth credentials present' : 'not configured',
+      required: ['MICROSOFT_CLIENT_ID', 'MICROSOFT_CLIENT_SECRET', 'MICROSOFT_ACCESS_TOKEN'],
       setup: ['Create Microsoft Entra app', 'Add mail/calendar scopes', 'Complete OAuth consent', 'Run sync adapter'],
-      nextStep: 'Configure Microsoft OAuth before syncing school mail and calendars.',
+      nextStep: 'Complete Microsoft OAuth before syncing school mail and calendars.',
     },
     {
       id: 'google',
       label: 'Google Workspace',
       surface: 'Gmail, Google Calendar, Drive',
-      status: envStatus(env, 'GOOGLE_CLIENT_ID') ? 'configured' : 'not configured',
-      required: ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'],
+      status: envStatus(env, 'GOOGLE_ACCESS_TOKEN') ? 'ready' : envStatus(env, 'GOOGLE_CLIENT_ID') ? 'oauth credentials present' : 'not configured',
+      required: ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_ACCESS_TOKEN'],
       setup: ['Create Google OAuth client', 'Add Gmail and Calendar scopes', 'Complete consent', 'Run sync adapter'],
-      nextStep: 'Configure Google OAuth before syncing institutional Gmail and calendars.',
+      nextStep: 'Complete Google OAuth before syncing institutional Gmail and calendars.',
     },
     {
       id: 'zoom',
@@ -523,6 +542,50 @@ function integrationStatuses(env = process.env) {
       nextStep: 'Choose a messaging provider and consent policy before enabling notifications.',
     },
   ];
+}
+
+function integrationOauthConfig(provider, env = process.env) {
+  const redirectUri = env.LABLINK_OAUTH_REDIRECT_URI || 'http://localhost:4867/oauth/callback';
+  if (provider === 'zoom') {
+    if (!envStatus(env, 'ZOOM_CLIENT_ID')) {
+      throw new HttpError(409, 'Zoom OAuth client ID is not configured.', { required: ['ZOOM_CLIENT_ID'] });
+    }
+    return {
+      label: 'Zoom',
+      authorizationUrl: `https://zoom.us/oauth/authorize?response_type=code&client_id=${encodeURIComponent(env.ZOOM_CLIENT_ID)}&redirect_uri=${encodeURIComponent(env.ZOOM_REDIRECT_URI || redirectUri)}`,
+      required: ['ZOOM_CLIENT_ID', 'ZOOM_CLIENT_SECRET'],
+      scopes: ['meeting:write:meeting'],
+    };
+  }
+  if (provider === 'google') {
+    if (!envStatus(env, 'GOOGLE_CLIENT_ID')) {
+      throw new HttpError(409, 'Google OAuth client ID is not configured.', { required: ['GOOGLE_CLIENT_ID'] });
+    }
+    const scope = [
+      'https://www.googleapis.com/auth/gmail.readonly',
+      'https://www.googleapis.com/auth/calendar.events',
+      'https://www.googleapis.com/auth/drive.metadata.readonly',
+    ].join(' ');
+    return {
+      label: 'Google Workspace',
+      authorizationUrl: `https://accounts.google.com/o/oauth2/v2/auth?response_type=code&access_type=offline&prompt=consent&client_id=${encodeURIComponent(env.GOOGLE_CLIENT_ID)}&redirect_uri=${encodeURIComponent(env.GOOGLE_REDIRECT_URI || redirectUri)}&scope=${encodeURIComponent(scope)}`,
+      required: ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'],
+      scopes: scope.split(' '),
+    };
+  }
+  if (provider === 'microsoft') {
+    if (!envStatus(env, 'MICROSOFT_CLIENT_ID')) {
+      throw new HttpError(409, 'Microsoft OAuth client ID is not configured.', { required: ['MICROSOFT_CLIENT_ID'] });
+    }
+    const scope = 'offline_access User.Read Mail.Read Calendars.ReadWrite Files.Read';
+    return {
+      label: 'Microsoft Graph',
+      authorizationUrl: `https://login.microsoftonline.com/${encodeURIComponent(env.MICROSOFT_TENANT_ID || 'common')}/oauth2/v2.0/authorize?response_type=code&client_id=${encodeURIComponent(env.MICROSOFT_CLIENT_ID)}&redirect_uri=${encodeURIComponent(env.MICROSOFT_REDIRECT_URI || redirectUri)}&scope=${encodeURIComponent(scope)}`,
+      required: ['MICROSOFT_CLIENT_ID', 'MICROSOFT_CLIENT_SECRET'],
+      scopes: scope.split(' '),
+    };
+  }
+  throw new HttpError(400, 'OAuth URL generation is available for zoom, google, and microsoft.', { provider });
 }
 
 function providerStatuses(store, env = process.env) {
@@ -651,6 +714,29 @@ async function postJson(url, headers, body) {
   }
   if (!response.ok) {
     const detail = payload.error?.message || payload.message || text || response.statusText;
+    throw new HttpError(response.status, detail, { upstream: payload });
+  }
+  return payload;
+}
+
+async function postForm(url, headers, body) {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+      ...headers,
+    },
+    body: new URLSearchParams(body),
+  });
+  const text = await response.text();
+  let payload;
+  try {
+    payload = text ? JSON.parse(text) : {};
+  } catch {
+    payload = { raw: text };
+  }
+  if (!response.ok) {
+    const detail = payload.reason || payload.error_description || payload.error || payload.message || text || response.statusText;
     throw new HttpError(response.status, detail, { upstream: payload });
   }
   return payload;
@@ -896,6 +982,7 @@ async function organizeWorkspace(store, body, env = process.env) {
   "workspace": "command|meetings|builder|projects|ai|integrations|settings",
   "focusTitle": "short title for the top focus area",
   "focusBrief": "one concise sentence explaining what matters now",
+  "orderedPanels": ["tasks","sections","meetings","risks","projects","integrations","ai","inbox"],
   "visiblePanels": ["focus","tasks","risks","sections","meetings","inbox","projects","ai","integrations"],
   "collapsedPanels": ["panel ids that should start collapsed"],
   "pinnedSectionIds": ["custom section ids to emphasize"],
@@ -991,6 +1078,122 @@ async function createZoomMeeting(body, env = process.env) {
   };
 }
 
+async function refreshZoomToken(context) {
+  const env = context.env;
+  const required = ['ZOOM_CLIENT_ID', 'ZOOM_CLIENT_SECRET', 'ZOOM_REFRESH_TOKEN'];
+  const missing = required.filter((key) => !envStatus(env, key));
+  if (missing.length) {
+    throw new HttpError(409, 'Zoom refresh requires OAuth app credentials and a refresh token.', { required: missing });
+  }
+  const basic = Buffer.from(`${env.ZOOM_CLIENT_ID}:${env.ZOOM_CLIENT_SECRET}`, 'utf8').toString('base64');
+  const response = await fetch('https://zoom.us/oauth/token', {
+    method: 'POST',
+    headers: {
+      authorization: `Basic ${basic}`,
+      'content-type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: env.ZOOM_REFRESH_TOKEN,
+    }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new HttpError(response.status, payload.reason || payload.error || 'Zoom token refresh failed.', { upstream: payload });
+  }
+  writeLocalSecrets(context.secretsFile, {
+    ZOOM_ACCESS_TOKEN: payload.access_token,
+    ZOOM_REFRESH_TOKEN: payload.refresh_token || env.ZOOM_REFRESH_TOKEN,
+  });
+  context.env.ZOOM_ACCESS_TOKEN = payload.access_token;
+  context.env.ZOOM_REFRESH_TOKEN = payload.refresh_token || env.ZOOM_REFRESH_TOKEN;
+  return {
+    accessToken: 'stored',
+    refreshToken: payload.refresh_token ? 'rotated' : 'unchanged',
+    expiresIn: payload.expires_in,
+    scope: payload.scope,
+  };
+}
+
+async function exchangeOauthCode(context, body) {
+  const env = context.env;
+  const provider = sanitizeString(body.provider, '', 32).toLowerCase();
+  const code = sanitizeString(body.code, '', 4096);
+  const fallbackRedirect = env.LABLINK_OAUTH_REDIRECT_URI || 'http://localhost:4867/oauth/callback';
+  if (!code) throw new HttpError(400, 'Authorization code is required.', { code: 'missing_authorization_code' });
+
+  if (provider === 'zoom') {
+    const required = ['ZOOM_CLIENT_ID', 'ZOOM_CLIENT_SECRET'];
+    const missing = required.filter((key) => !envStatus(env, key));
+    if (missing.length) throw new HttpError(409, 'Zoom OAuth exchange requires app credentials.', { required: missing });
+    const payload = await postForm(
+      'https://zoom.us/oauth/token',
+      { authorization: `Basic ${Buffer.from(`${env.ZOOM_CLIENT_ID}:${env.ZOOM_CLIENT_SECRET}`, 'utf8').toString('base64')}` },
+      {
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: body.redirectUri || env.ZOOM_REDIRECT_URI || fallbackRedirect,
+      },
+    );
+    const updates = { ZOOM_ACCESS_TOKEN: payload.access_token };
+    if (payload.refresh_token || env.ZOOM_REFRESH_TOKEN) updates.ZOOM_REFRESH_TOKEN = payload.refresh_token || env.ZOOM_REFRESH_TOKEN;
+    writeLocalSecrets(context.secretsFile, updates);
+    context.env.ZOOM_ACCESS_TOKEN = payload.access_token;
+    if (payload.refresh_token) context.env.ZOOM_REFRESH_TOKEN = payload.refresh_token;
+    return { label: 'Zoom', accessToken: 'stored', refreshToken: payload.refresh_token ? 'stored' : 'not returned', expiresIn: payload.expires_in, scope: payload.scope };
+  }
+
+  if (provider === 'google') {
+    const required = ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'];
+    const missing = required.filter((key) => !envStatus(env, key));
+    if (missing.length) throw new HttpError(409, 'Google OAuth exchange requires app credentials.', { required: missing });
+    const payload = await postForm(
+      'https://oauth2.googleapis.com/token',
+      {},
+      {
+        grant_type: 'authorization_code',
+        client_id: env.GOOGLE_CLIENT_ID,
+        client_secret: env.GOOGLE_CLIENT_SECRET,
+        code,
+        redirect_uri: body.redirectUri || env.GOOGLE_REDIRECT_URI || fallbackRedirect,
+      },
+    );
+    const updates = { GOOGLE_ACCESS_TOKEN: payload.access_token };
+    if (payload.refresh_token || env.GOOGLE_REFRESH_TOKEN) updates.GOOGLE_REFRESH_TOKEN = payload.refresh_token || env.GOOGLE_REFRESH_TOKEN;
+    writeLocalSecrets(context.secretsFile, updates);
+    context.env.GOOGLE_ACCESS_TOKEN = payload.access_token;
+    if (payload.refresh_token) context.env.GOOGLE_REFRESH_TOKEN = payload.refresh_token;
+    return { label: 'Google Workspace', accessToken: 'stored', refreshToken: payload.refresh_token ? 'stored' : 'not returned', expiresIn: payload.expires_in, scope: payload.scope };
+  }
+
+  if (provider === 'microsoft') {
+    const required = ['MICROSOFT_CLIENT_ID', 'MICROSOFT_CLIENT_SECRET'];
+    const missing = required.filter((key) => !envStatus(env, key));
+    if (missing.length) throw new HttpError(409, 'Microsoft OAuth exchange requires app credentials.', { required: missing });
+    const tenant = encodeURIComponent(env.MICROSOFT_TENANT_ID || 'common');
+    const payload = await postForm(
+      `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`,
+      {},
+      {
+        grant_type: 'authorization_code',
+        client_id: env.MICROSOFT_CLIENT_ID,
+        client_secret: env.MICROSOFT_CLIENT_SECRET,
+        code,
+        redirect_uri: body.redirectUri || env.MICROSOFT_REDIRECT_URI || fallbackRedirect,
+        scope: 'offline_access User.Read Mail.Read Calendars.ReadWrite Files.Read',
+      },
+    );
+    const updates = { MICROSOFT_ACCESS_TOKEN: payload.access_token };
+    if (payload.refresh_token || env.MICROSOFT_REFRESH_TOKEN) updates.MICROSOFT_REFRESH_TOKEN = payload.refresh_token || env.MICROSOFT_REFRESH_TOKEN;
+    writeLocalSecrets(context.secretsFile, updates);
+    context.env.MICROSOFT_ACCESS_TOKEN = payload.access_token;
+    if (payload.refresh_token) context.env.MICROSOFT_REFRESH_TOKEN = payload.refresh_token;
+    return { label: 'Microsoft Graph', accessToken: 'stored', refreshToken: payload.refresh_token ? 'stored' : 'not returned', expiresIn: payload.expires_in, scope: payload.scope };
+  }
+
+  throw new HttpError(400, 'OAuth code exchange is available for zoom, google, and microsoft.', { provider });
+}
+
 async function readBody(request) {
   return new Promise((resolve, reject) => {
     let total = 0;
@@ -1064,6 +1267,17 @@ async function handleApi(request, response, context, pathname) {
       selectedProvider: resolveProvider(store, context.env),
     });
   }
+  if (request.method === 'POST' && pathname === '/api/integrations/oauth-url') {
+    const body = await readBody(request);
+    return sendJson(response, 200, integrationOauthConfig(String(body.provider || ''), context.env));
+  }
+  if (request.method === 'POST' && pathname === '/api/integrations/oauth/exchange') {
+    const body = await readBody(request);
+    return sendJson(response, 200, await exchangeOauthCode(context, body));
+  }
+  if (request.method === 'POST' && pathname === '/api/integrations/zoom/refresh') {
+    return sendJson(response, 200, await refreshZoomToken(context));
+  }
   if (request.method === 'POST' && pathname === '/api/meeting/rules') {
     const body = await readBody(request);
     return sendJson(response, 200, extractMeetingRules(body));
@@ -1132,8 +1346,13 @@ function runWebSmoke(args = []) {
   assert(css.includes('--canvas'), 'styles define design tokens');
   assert(js.includes('SpeechRecognition'), 'client includes live notes capability check');
   assert(js.includes('Lab Builder'), 'client includes adaptive Lab Builder');
+  assert(js.includes('@motionone/dom'), 'client progressively loads Motion One');
+  assert(js.includes('@floating-ui/dom'), 'client progressively loads Floating UI');
+  assert(js.includes('sortablejs'), 'client progressively loads SortableJS');
   assert(js.includes('/api/workspace/propose'), 'client can request provider-backed section proposals');
   assert(js.includes('/api/workspace/organize'), 'client can request provider-backed workspace organization');
+  assert(js.includes('/api/integrations/oauth-url'), 'client can request integration OAuth URLs');
+  assert(js.includes('/api/integrations/oauth/exchange'), 'client can exchange provider OAuth codes');
   const store = loadStore(dataDir);
   const state = buildState(store, {});
   assert(state.counts.openTasks > 0, 'state exposes open tasks');
@@ -1154,6 +1373,8 @@ function runWebSmoke(args = []) {
   assert(section.title === 'Protocol Tracker', 'custom section sanitizer keeps title');
   const plan = sanitizeOrganizerPlan({ workspace: 'meetings', visiblePanels: ['focus', 'tasks', 'unknown'], collapsedPanels: ['risks'] });
   assert(plan.workspace === 'meetings' && plan.visiblePanels.length === 2, 'workspace organizer sanitizer works');
+  const googleOauth = integrationOauthConfig('google', { GOOGLE_CLIENT_ID: 'client' });
+  assert(googleOauth.authorizationUrl.includes('accounts.google.com'), 'google OAuth URL helper works');
   process.stdout.write('Web smoke passed.\n');
 }
 

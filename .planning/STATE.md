@@ -63,9 +63,10 @@ Current web platform completion promise:
 - The browser default should stay calm and customizable: optional context rail, focus-first command view, and Lab Builder for lab-specific sections.
 - Lab Builder may use AI to propose new sections only through a real configured provider; manual local sections remain available without AI.
 - The browser should avoid permanent tab clutter: one workspace selector, a compact AI organizer, and user-controlled visible/collapsed panels are the current interaction model.
+- The refined v2.6 browser should avoid native-looking primary dropdowns and dashboard walls: command composer, focus canvas, adaptive sections, role presets, inspector sheet, progressive Motion/Floating UI/Sortable enhancement, guided OAuth URL/code-exchange helpers, and real-provider AI organization are the current interaction model.
 
 ## Next Actions
 
 - Start the local web server for browser review.
 - Publish the beta after a final `npm run release:check` in the release environment.
-- Continue OAuth-backed Microsoft/Google/Zoom setup flows, AI-generated section editing, saved layout presets, richer meeting-to-execution publishing, and direct manipulation of panel order.
+- Continue full OAuth callbacks, token storage hardening, AI-generated section editing, saved layout presets, richer meeting-to-execution publishing, and deeper lab ontology modeling.

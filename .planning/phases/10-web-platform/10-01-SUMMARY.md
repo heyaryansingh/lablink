@@ -15,6 +15,7 @@ Status: Complete
 - Added custom section persistence routes for apply/delete workflows.
 - Replaced the tab-heavy main surface with one workspace selector, a compact AI organizer, and customizable visible/collapsed panels.
 - Added a real-provider workspace organizer route that can choose workspace mode, focus copy, visible panels, collapsed panels, pinned sections, and suggested actions.
+- Added the v2.6 refined interaction PRD and implemented the next shell pass: command composer, focus canvas, adaptive sections, role presets, inspector sheet, progressive Motion/Floating UI/Sortable loading, guided integration surfaces, OAuth URL helper, OAuth authorization-code exchange, and Zoom refresh helper.
 - Added beta packaging coverage for the website and web smoke checks.
 
 ## Verification
@@ -24,6 +25,7 @@ Status: Complete
 - Local HTTP check passed for `/api/health` and `/`.
 - Local HTTP check passed for custom section save/delete.
 - Web smoke now checks the provider-backed workspace organizer route wiring and sanitizer.
+- Web smoke now checks progressive external interaction library wiring and integration OAuth helper wiring.
 - `npm run validate` passed.
 - `npm run release:check` passed and validated installed package web smoke.
 
@@ -35,6 +37,8 @@ Status: Complete
 - The weakest issue found was duplicate direct-run execution when importing the web server from the CLI; it was fixed by checking the actual process entrypoint.
 - The second refinement removed visual crowding by making the context rail optional and moving lab customization into Lab Builder rather than overloading the command rail.
 - The third refinement removed persistent screen tabs and made AI act on the current workspace instead of living only in a separate AI page.
+- The fourth refinement removed primary native dropdown navigation and reduced the display to an app workspace: command, focus, adaptive sections, role presets, and temporary inspector.
+- The fifth refinement replaced the last native density select and visible design-explainer block, then added real OAuth code exchange for Zoom, Google, and Microsoft.
 
 ## Next
 

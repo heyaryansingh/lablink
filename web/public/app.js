@@ -1,14 +1,65 @@
 const STORAGE_KEY = 'lablink.web.v2.4';
 
 const TABS = [
-  { id: 'command', label: 'Command', key: '1' },
-  { id: 'meetings', label: 'Meeting Studio', key: '2' },
-  { id: 'builder', label: 'Lab Builder', key: '3' },
+  { id: 'command', label: 'Focus', key: '1' },
+  { id: 'meetings', label: 'Meetings', key: '2' },
+  { id: 'builder', label: 'Build', key: '3' },
   { id: 'projects', label: 'Projects', key: '4' },
-  { id: 'ai', label: 'AI Review', key: '5' },
-  { id: 'integrations', label: 'Integrations', key: '6' },
-  { id: 'settings', label: 'Settings', key: '7' },
+  { id: 'integrations', label: 'Integrations', key: '5' },
+  { id: 'ai', label: 'Review', key: '6' },
 ];
+
+const DEFAULT_PANEL_ORDER = ['tasks', 'sections', 'meetings', 'risks', 'projects', 'integrations', 'ai', 'inbox'];
+
+const WORKSPACE_PRESETS = [
+  { id: 'command', label: 'Focus', intent: 'Focus on the few lab actions that matter today.' },
+  { id: 'meetings', label: 'Meeting', intent: 'Prepare or process the current meeting into tasks, risks, and follow-up.' },
+  { id: 'builder', label: 'Build', intent: 'Create or adapt lab-specific sections for this workspace.' },
+  { id: 'projects', label: 'Projects', intent: 'Review project status, owners, deadlines, and blockers.' },
+  { id: 'integrations', label: 'Integrations', intent: 'Set up or check Zoom, email, calendar, Slack, Notion, and messaging integrations.' },
+  { id: 'ai', label: 'Review', intent: 'Review provider-backed suggestions and provenance.' },
+];
+
+const ROLE_PRESETS = [
+  {
+    id: 'pi',
+    label: 'PI Review',
+    intent: 'Review project health, major risks, grant pressure, and decisions that need PI attention.',
+    panels: ['focus', 'projects', 'risks', 'ai'],
+    collapsed: ['ai'],
+    actions: ['Review at-risk projects', 'Approve decisions', 'Open grant deadlines'],
+  },
+  {
+    id: 'lab-manager',
+    label: 'Lab Manager',
+    intent: 'Track reagents, equipment, safety items, meeting follow-up, and blocked operational work.',
+    panels: ['focus', 'tasks', 'sections', 'risks', 'integrations'],
+    collapsed: ['integrations'],
+    actions: ['Check blockers', 'Update lab sections', 'Review setup gaps'],
+  },
+  {
+    id: 'researcher',
+    label: 'Researcher',
+    intent: 'Keep my experiments, analysis tasks, meetings, and immediate blockers visible.',
+    panels: ['focus', 'tasks', 'meetings', 'sections'],
+    collapsed: [],
+    actions: ['Work top task', 'Process meeting notes', 'Update experiment section'],
+  },
+  {
+    id: 'computational',
+    label: 'Computational',
+    intent: 'Emphasize analysis queues, project deadlines, collaboration follow-up, and compute-related tasks.',
+    panels: ['focus', 'tasks', 'projects', 'inbox'],
+    collapsed: ['inbox'],
+    actions: ['Review analysis tasks', 'Check collaborator inbox', 'Prepare update'],
+  },
+];
+
+const DESIGN_LIBRARY_URLS = {
+  motion: 'https://cdn.jsdelivr.net/npm/@motionone/dom@10.18.0/+esm',
+  floating: 'https://cdn.jsdelivr.net/npm/@floating-ui/dom@1.7.4/+esm',
+  sortable: 'https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/+esm',
+};
 
 const DEFAULT_AGENDA = [
   'AT8 antibody supply and alternate vendor decision',
@@ -33,6 +84,13 @@ const state = {
   railFocus: 'operations',
   showIntel: false,
   customize: false,
+  commandOpen: false,
+  paletteIndex: 0,
+  paletteFocusItems: false,
+  inspector: { open: false, mode: 'context', itemId: null },
+  libraries: { loaded: false, motion: null, floating: null, sortable: null, status: 'fallback' },
+  sortableInstance: null,
+  panelOrder: [...DEFAULT_PANEL_ORDER],
   visiblePanels: {
     focus: true,
     tasks: true,
@@ -70,6 +128,12 @@ const state = {
     liveSupported: false,
     busy: null,
   },
+  integration: {
+    oauthCode: '',
+    busy: null,
+    authorizationUrl: '',
+    authorizationLabel: '',
+  },
   toast: null,
 };
 
@@ -88,6 +152,7 @@ function loadPrefs() {
     if (typeof prefs.customize === 'boolean') state.customize = prefs.customize;
     if (prefs.visiblePanels) state.visiblePanels = { ...state.visiblePanels, ...prefs.visiblePanels };
     if (prefs.collapsedPanels) state.collapsedPanels = prefs.collapsedPanels;
+    if (Array.isArray(prefs.panelOrder)) state.panelOrder = normalizePanelOrder(prefs.panelOrder);
     if (prefs.visibleModules) state.visibleModules = prefs.visibleModules;
   } catch {
     localStorage.removeItem(STORAGE_KEY);
@@ -104,6 +169,7 @@ function savePrefs() {
     customize: state.customize,
     visiblePanels: state.visiblePanels,
     collapsedPanels: state.collapsedPanels,
+    panelOrder: state.panelOrder,
     visibleModules: state.visibleModules,
   }));
 }
@@ -119,6 +185,15 @@ function normalizeTabOrder(order) {
 
 function tabById(id) {
   return TABS.find((tab) => tab.id === id) || TABS[0];
+}
+
+function normalizePanelOrder(order) {
+  const valid = new Set(DEFAULT_PANEL_ORDER);
+  const unique = order.filter((id, index) => valid.has(id) && order.indexOf(id) === index);
+  for (const id of DEFAULT_PANEL_ORDER) {
+    if (!unique.includes(id)) unique.push(id);
+  }
+  return unique;
 }
 
 function escapeHtml(value) {
@@ -173,6 +248,7 @@ async function api(path, options = {}) {
 async function loadData() {
   loadPrefs();
   state.meeting.liveSupported = Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+  loadDesignLibraries();
   try {
     state.data = await api('/api/state');
     state.loading = false;
@@ -186,6 +262,21 @@ async function loadData() {
     state.toast = `Could not load Lab Link: ${error.message}`;
     render();
   }
+}
+
+async function loadDesignLibraries() {
+  const results = await Promise.allSettled([
+    import(DESIGN_LIBRARY_URLS.motion),
+    import(DESIGN_LIBRARY_URLS.floating),
+    import(DESIGN_LIBRARY_URLS.sortable),
+  ]);
+  const [motion, floating, sortable] = results;
+  state.libraries.motion = motion.status === 'fulfilled' ? motion.value : null;
+  state.libraries.floating = floating.status === 'fulfilled' ? floating.value : null;
+  state.libraries.sortable = sortable.status === 'fulfilled' ? sortable.value.default || sortable.value : null;
+  state.libraries.loaded = true;
+  state.libraries.status = [state.libraries.motion, state.libraries.floating, state.libraries.sortable].filter(Boolean).length ? 'enhanced' : 'fallback';
+  afterRender();
 }
 
 function render() {
@@ -209,28 +300,30 @@ function render() {
 
   app.innerHTML = `
     ${renderTopbar()}
-    <div class="workspace ${state.showIntel ? '' : 'no-intel'}">
-      <aside class="rail"><div class="rail-scroll">${renderRail()}</div></aside>
-      <main class="main"><div class="main-scroll">${renderMain()}</div></main>
-      <aside class="intel-rail"><div class="intel-scroll">${renderIntelRail()}</div></aside>
+    <div class="studio-shell ${state.inspector.open ? 'inspector-open' : ''}">
+      <main class="stage"><div class="stage-scroll">${renderMain()}</div></main>
+      ${renderInspector()}
     </div>
-    ${state.toast ? `<div class="toast">${escapeHtml(state.toast)}</div>` : ''}`;
+    ${state.commandOpen ? renderCommandPalette() : ''}
+    ${state.toast ? `<div class="toast" data-animate>${escapeHtml(state.toast)}</div>` : ''}`;
+  afterRender();
 }
 
 function renderTopbar() {
   const { lab, user } = state.data;
   return `
     <header class="topbar">
-      <div>
+      <button class="brand-button" type="button" data-action="open-inspector" data-inspector-mode="context">
         <div class="product-mark">${escapeHtml(lab.name)} / Lab Link</div>
         <div class="muted small">${escapeHtml(lab.institution)} - ${escapeHtml(user.name)} (${escapeHtml(user.role)})</div>
-      </div>
+      </button>
       <div class="topbar-actions">
-        <select class="workspace-select" id="workspace-select" aria-label="Workspace">
-          ${TABS.map((tab) => `<option value="${tab.id}" ${state.activeTab === tab.id ? 'selected' : ''}>${escapeHtml(tab.label)}</option>`).join('')}
-        </select>
+        <button class="mode-button" type="button" data-action="toggle-command" aria-expanded="${state.commandOpen ? 'true' : 'false'}">
+          <span>${escapeHtml(tabById(state.activeTab).label)}</span>
+          <span class="mode-kbd">Ctrl K</span>
+        </button>
         <button class="button ghost" type="button" data-action="toggle-customize">${state.customize ? 'Done' : 'Customize'}</button>
-        <button class="button primary" type="button" data-action="organize-workspace" ${state.organizer.busy ? 'disabled' : ''}>AI Organize</button>
+        <button class="button primary" type="button" data-action="organize-workspace" ${state.organizer.busy ? 'disabled' : ''}>Organize</button>
       </div>
     </header>`;
 }
@@ -298,23 +391,31 @@ function renderPanelChooser() {
 
 function renderMain() {
   return `
-    ${renderAdaptiveBar()}
+    ${renderCommandComposer()}
     ${state.organizer.plan ? renderOrganizerPlan() : ''}
     ${renderActiveView()}`;
 }
 
-function renderAdaptiveBar() {
+function renderCommandComposer() {
   return `
-    <section class="adaptive-bar">
+    <section class="command-composer" data-animate>
       <div>
-        <div class="eyebrow">Adaptive Workspace</div>
-        <strong>${escapeHtml(tabById(state.activeTab).label)}</strong>
+        <div class="eyebrow">Current Workspace</div>
+        <div class="workspace-pills">
+          ${WORKSPACE_PRESETS.map((preset) => `
+            <button class="workspace-pill ${state.activeTab === preset.id ? 'active' : ''}" type="button" data-tab="${preset.id}" title="${escapeHtml(preset.intent)}">${escapeHtml(preset.label)}</button>
+          `).join('')}
+        </div>
       </div>
-      <div class="adaptive-actions">
-        <button class="button compact ghost" type="button" data-action="density-toggle">${escapeHtml(state.density)}</button>
-        <button class="button compact ghost" type="button" data-action="toggle-intel">${state.showIntel ? 'Hide context' : 'Context'}</button>
-        <button class="button compact" type="button" data-action="focus-preset">Focus preset</button>
-        <button class="button compact" type="button" data-action="everything-preset">Everything</button>
+      <div class="composer-input-row">
+        <textarea id="organizer-intent" rows="2">${escapeHtml(state.organizer.intent)}</textarea>
+        <button class="composer-submit" type="button" data-action="organize-workspace" ${state.organizer.busy ? 'disabled' : ''}>${state.organizer.busy ? 'Working' : 'Organize'}</button>
+      </div>
+      <div class="composer-meta">
+        <button class="text-action" type="button" data-action="focus-preset">Focus preset</button>
+        <button class="text-action" type="button" data-action="everything-preset">Show more</button>
+        <button class="text-action" type="button" data-action="open-inspector" data-inspector-mode="integrations">Integrations</button>
+        <span>${providerReady() ? 'Real provider configured' : 'Real AI provider required'}</span>
       </div>
     </section>`;
 }
@@ -322,7 +423,7 @@ function renderAdaptiveBar() {
 function renderOrganizerPlan() {
   const plan = state.organizer.plan;
   return `
-    <section class="organizer-plan">
+    <section class="organizer-plan" data-animate>
       <div>
         <div class="eyebrow">AI Organized</div>
         <h2>${escapeHtml(plan.focusTitle)}</h2>
@@ -358,11 +459,15 @@ function renderPanel(id, title, subtitle, content, actions = '') {
   if (!panelEnabled(id)) return '';
   const collapsed = panelCollapsed(id);
   return `
-    <section class="panel quiet-panel adaptive-panel" data-panel="${id}">
+    <section class="adaptive-panel" data-panel="${id}" data-animate draggable="true">
       <div class="panel-header">
-        <div><div class="eyebrow">${escapeHtml(title)}</div><div class="panel-title">${escapeHtml(subtitle)}</div></div>
+        <div class="panel-title-wrap">
+          <span class="drag-handle" title="Reorder">::</span>
+          <div><div class="eyebrow">${escapeHtml(title)}</div><div class="panel-title">${escapeHtml(subtitle)}</div></div>
+        </div>
         <div class="inline-actions">
           ${actions}
+          <button class="button compact ghost" type="button" data-action="inspect-panel" data-panel-id="${id}">Inspect</button>
           <button class="button compact ghost" type="button" data-action="collapse-panel" data-panel-id="${id}">${collapsed ? 'Open' : 'Close'}</button>
           ${state.customize ? `<button class="button compact ghost" type="button" data-action="hide-panel" data-panel-id="${id}">Hide</button>` : ''}
         </div>
@@ -373,13 +478,22 @@ function renderPanel(id, title, subtitle, content, actions = '') {
 
 function renderCommand() {
   const leadTask = state.data.tasks[0];
-  const nextMeeting = state.data.meetings.find((meeting) => meeting.status === 'scheduled') || state.data.meetings[0];
   const customSections = state.data.customSections || [];
   const plan = state.organizer.plan;
+  const panels = {
+    tasks: () => renderPanel('tasks', 'Priority Queue', 'Work that should stay visible', `<div class="stream-list">${state.data.tasks.slice(0, 4).map(renderTask).join('')}</div>`),
+    sections: () => renderPanel('sections', 'Lab Sections', 'Custom surfaces for this lab', `<div class="section-flow">${customSections.slice(0, 4).map(renderCustomSection).join('') || '<div class="muted">No custom sections yet.</div>'}</div>`, '<button class="button compact" type="button" data-tab="builder">Build</button>'),
+    meetings: () => renderPanel('meetings', 'Meetings', 'Current coordination thread', `<div class="stream-list">${state.data.meetings.map(renderMeetingRow).join('')}</div>`, '<button class="button compact" type="button" data-tab="meetings">Studio</button>'),
+    risks: () => renderPanel('risks', 'Risk Radar', 'Blockers that change the plan', `<div class="stream-list">${state.data.risks.map(renderRisk).join('')}</div>`),
+    projects: () => renderPanel('projects', 'Projects', 'Portfolio summary', `<div class="section-flow">${state.data.projects.slice(0, 4).map(renderProjectMini).join('')}</div>`),
+    integrations: () => renderPanel('integrations', 'Integrations', 'External surfaces and setup state', `<div class="stream-list">${state.data.integrations.slice(0, 6).map(renderIntegrationMini).join('')}</div>`, '<button class="button compact" type="button" data-tab="integrations">Setup</button>'),
+    ai: () => renderPanel('ai', 'Review', 'Provider-backed suggestions', `<div class="stream-list">${state.data.aiSuggestions.slice(0, 4).map(renderSuggestion).join('')}</div>`),
+    inbox: () => renderPanel('inbox', 'Inbox', 'Messages worth converting into action', `<div class="stream-list">${state.data.inbox.map(renderInbox).join('')}</div>`),
+  };
   return `
-    <section class="view-header">
+    <section class="view-header minimal-header" data-animate>
       <div>
-        <div class="eyebrow">Command Center</div>
+        <div class="eyebrow">Focus Canvas</div>
         <h1>${escapeHtml(plan?.focusTitle || 'One workspace, selectively arranged')}</h1>
         <p>${escapeHtml(plan?.focusBrief || 'Lab Link now hides the surface area you do not need and lets AI reorganize the workspace around the moment.')}</p>
       </div>
@@ -389,7 +503,7 @@ function renderCommand() {
       </div>
     </section>
     ${panelEnabled('focus') ? `
-      <section class="focus-canvas">
+      <section class="focus-canvas" data-animate>
         <div>
           <div class="eyebrow">Primary Focus</div>
           <h2>${escapeHtml(leadTask?.title || 'No open task')}</h2>
@@ -406,15 +520,8 @@ function renderCommand() {
           <span>${state.data.counts.pendingAi} reviews</span>
         </div>
       </section>` : ''}
-    <div class="adaptive-stack">
-      ${renderPanel('tasks', 'Priority Queue', 'Only the work that should stay visible', `<div class="item-list">${state.data.tasks.slice(0, 4).map(renderTask).join('')}</div>`)}
-      ${renderPanel('sections', 'Lab Sections', 'Custom surfaces for this lab', `<div class="section-grid compact-sections">${customSections.slice(0, 3).map(renderCustomSection).join('') || '<div class="muted">No custom sections yet.</div>'}</div>`, '<button class="button compact" type="button" data-tab="builder">Build</button>')}
-      ${renderPanel('risks', 'Risk Radar', 'Only blockers that change the plan', `<div class="item-list">${state.data.risks.map(renderRisk).join('')}</div>`)}
-      ${renderPanel('meetings', 'Meetings', 'The current coordination thread', `<div class="item-list">${state.data.meetings.map(renderMeetingRow).join('')}</div>`, '<button class="button compact" type="button" data-tab="meetings">Studio</button>')}
-      ${renderPanel('inbox', 'Inbox', 'Messages worth converting into action', `<div class="item-list">${state.data.inbox.map(renderInbox).join('')}</div>`)}
-      ${renderPanel('projects', 'Projects', 'Portfolio summary', `<div class="section-grid compact-sections">${state.data.projects.slice(0, 4).map(renderProjectMini).join('')}</div>`)}
-      ${renderPanel('ai', 'AI Review', 'Pending suggestions', `<div class="item-list">${state.data.aiSuggestions.slice(0, 4).map(renderSuggestion).join('')}</div>`)}
-      ${renderPanel('integrations', 'Integrations', 'Configured external surfaces', `<div class="item-list">${state.data.integrations.slice(0, 6).map(renderIntegrationMini).join('')}</div>`)}
+    <div class="surface-flow" data-sortable-panels>
+      ${state.panelOrder.map((id) => panels[id]?.() || '').join('')}
     </div>`;
 }
 
@@ -675,12 +782,14 @@ function renderLabBuilder() {
         </div>
       </div>
       <div class="panel quiet-panel">
-        <div class="panel-header"><div><div class="eyebrow">Design Choices</div><div class="panel-title">Why this is calmer</div></div></div>
-        <div class="item-list">
-          <div class="architecture-row"><strong>Focus first</strong><span>Command view now emphasizes a primary task, next meeting, and only active blockers.</span></div>
-          <div class="architecture-row"><strong>Optional context</strong><span>The intelligence rail is hidden by default and can be toggled on when needed.</span></div>
-          <div class="architecture-row"><strong>Custom sections</strong><span>Each lab can add management surfaces without changing code or installing plugins.</span></div>
-          <div class="architecture-row"><strong>Real AI only</strong><span>AI composition fails honestly if the provider is unavailable.</span></div>
+        <div class="panel-header"><div><div class="eyebrow">Role Presets</div><div class="panel-title">Start from the way this person works</div></div></div>
+        <div class="role-grid">
+          ${ROLE_PRESETS.map((preset) => `
+            <button class="role-card" type="button" data-action="role-preset" data-role="${escapeHtml(preset.id)}">
+              <strong>${escapeHtml(preset.label)}</strong>
+              <span>${escapeHtml(preset.intent)}</span>
+            </button>
+          `).join('')}
         </div>
       </div>
     </section>
@@ -765,37 +874,44 @@ function renderSuggestion(item) {
 function renderIntegrations() {
   const configured = state.data.integrations.filter((item) => ['configured', 'ready', 'oauth credentials present'].includes(item.status));
   return `
-    <section class="view-header">
+    <section class="view-header minimal-header" data-animate>
       <div>
         <div class="eyebrow">Integrations</div>
-        <h1>Institution and lab coordination surfaces</h1>
-        <p>Readiness is based on configured credentials. Setup stays visible so each lab can bring Outlook, Gmail, Slack, Notion, Zoom, and messaging online at its own pace.</p>
+        <h1>Connect the systems the lab already uses</h1>
+        <p>Credentials, consent, sync, and publish are separate steps. Lab Link only marks a surface ready when credentials and route capability exist.</p>
       </div>
-      <div class="inline-actions"><span class="pill ${configured.length ? 'ok' : ''}">${configured.length} ready</span></div>
+      <div class="inline-actions">
+        <span class="pill ${configured.length ? 'ok' : ''}">${configured.length} ready</span>
+        <button class="button secondary" type="button" data-action="open-inspector" data-inspector-mode="integrations">Setup helper</button>
+      </div>
     </section>
-    <section class="integration-summary">
+    <section class="integration-path" data-animate>
       <div>
         <div class="eyebrow">Setup Path</div>
-        <h2>Connect one surface at a time</h2>
+        <h2>Credentials -> Consent -> Sync -> Publish</h2>
       </div>
-      <div class="setup-steps">
-        <span>1. Credentials</span>
-        <span>2. Consent</span>
-        <span>3. Sync</span>
-        <span>4. Publish</span>
-      </div>
+      <p>Each provider follows the same route, but the scopes and policies stay provider-specific.</p>
     </section>
-    <section class="grid two">
+    <section class="integration-lanes">
       ${state.data.integrations.map((item) => `
-        <article class="integration-row">
-          <div>
-            <div class="project-title">${escapeHtml(item.label)}</div>
-            <div class="muted small">${escapeHtml(item.surface)}</div>
-            <div class="meta">${(item.required || []).map((key) => `<span class="pill">${escapeHtml(key)}</span>`).join('')}</div>
-            ${(item.setup || []).length ? `<div class="setup-mini">${item.setup.map((step) => `<span>${escapeHtml(step)}</span>`).join('')}</div>` : ''}
-            <p class="muted small">${escapeHtml(item.nextStep)}</p>
+        <article class="integration-lane" data-animate>
+          <div class="lane-head">
+            <div>
+              <div class="eyebrow">${escapeHtml(item.status)}</div>
+              <h3>${escapeHtml(item.label)}</h3>
+              <p>${escapeHtml(item.surface)}</p>
+            </div>
+            <button class="button compact" type="button" data-action="integration-oauth" data-provider="${escapeHtml(item.id)}">OAuth URL</button>
           </div>
-          <span class="pill ${statusClass(item.status)}">${escapeHtml(item.status)}</span>
+          <div class="lane-steps">
+            ${(item.setup || ['Add credentials', 'Authorize', 'Sync', 'Publish']).map((step, index) => `
+              <span class="${index === 0 && item.status !== 'not configured' ? 'done' : ''}">${escapeHtml(step)}</span>
+            `).join('')}
+          </div>
+          <div class="lane-foot">
+            <span>${escapeHtml((item.required || []).join(' / '))}</span>
+            <strong>${escapeHtml(item.nextStep)}</strong>
+          </div>
         </article>
       `).join('')}
     </section>`;
@@ -807,29 +923,29 @@ function renderSettings() {
       <div>
         <div class="eyebrow">Settings</div>
         <h1>Workspace architecture and lab adaptation</h1>
-        <p>Navigation, density, module surface, and provider policy are exposed as first-class configuration.</p>
+        <p>Personal workspace choices persist locally and can be overridden by direct manipulation or provider-backed organization.</p>
       </div>
     </section>
     <section class="grid two">
       <div class="panel">
-        <div class="panel-header"><div><div class="eyebrow">Layout</div><div class="panel-title">Three-plane workspace</div></div></div>
+        <div class="panel-header"><div><div class="eyebrow">Layout</div><div class="panel-title">Current interaction layers</div></div></div>
         <div class="item-list">
-          <div class="architecture-row"><strong>Command rail</strong><span>Lab identity, modules, focus mode, and daily signals.</span></div>
-          <div class="architecture-row"><strong>Workspace tabs</strong><span>Draggable operating modes persisted in this browser.</span></div>
-          <div class="architecture-row"><strong>Intelligence rail</strong><span>Provider status, review queue, and meeting extraction context.</span></div>
+          <div class="architecture-row"><strong>Composer</strong><span>One command surface for search, workspace shifts, and provider-backed organization.</span></div>
+          <div class="architecture-row"><strong>Sections</strong><span>Reorder, collapse, hide, and restore lab surfaces without editing config.</span></div>
+          <div class="architecture-row"><strong>Inspector</strong><span>Details, provenance, OAuth setup, and library status appear only when opened.</span></div>
         </div>
       </div>
       <div class="panel">
         <div class="panel-header"><div><div class="eyebrow">Controls</div><div class="panel-title">Personal surface</div></div></div>
         <div class="form-grid">
           <div class="field">
-            <label for="density">Density</label>
-            <select id="density">
-              <option value="compact" ${state.density === 'compact' ? 'selected' : ''}>compact</option>
-              <option value="comfortable" ${state.density === 'comfortable' ? 'selected' : ''}>comfortable</option>
-            </select>
+            <label>Density</label>
+            <div class="segmented-control" role="group" aria-label="Density">
+              <button class="segmented-button ${state.density === 'compact' ? 'active' : ''}" type="button" data-action="density-set" data-density="compact">Compact</button>
+              <button class="segmented-button ${state.density === 'comfortable' ? 'active' : ''}" type="button" data-action="density-set" data-density="comfortable">Comfortable</button>
+            </div>
           </div>
-          <button class="button" type="button" data-action="reset-tabs">Reset tab order</button>
+          <button class="button" type="button" data-action="reset-tabs">Reset workspace order</button>
           <button class="button ghost" type="button" data-action="clear-prefs">Clear browser preferences</button>
         </div>
       </div>
@@ -883,6 +999,115 @@ function renderIntelRail() {
         `).join('')}
       </div>
     </section>`;
+}
+
+function renderInspector() {
+  if (!state.inspector.open) return '';
+  const mode = state.inspector.mode;
+  const title = {
+    context: 'Workspace Context',
+    integrations: 'Integration Setup',
+    libraries: 'Interaction Libraries',
+    ai: 'AI Provenance',
+  }[mode] || 'Inspector';
+  return `
+    <aside class="inspector-sheet" data-animate>
+      <div class="inspector-head">
+        <div><div class="eyebrow">${escapeHtml(title)}</div><h2>${escapeHtml(tabById(state.activeTab).label)}</h2></div>
+        <button class="icon-button" type="button" data-action="close-inspector" aria-label="Close inspector">x</button>
+      </div>
+      ${mode === 'integrations' ? renderIntegrationInspector() : ''}
+      ${mode === 'libraries' ? renderLibraryInspector() : ''}
+      ${mode === 'ai' ? renderAiInspector() : ''}
+      ${mode === 'context' ? renderContextInspector() : ''}
+    </aside>`;
+}
+
+function renderContextInspector() {
+  return `
+    <div class="inspector-stack">
+      <div class="inspector-line"><span>Visible panels</span><strong>${Object.values(state.visiblePanels).filter(Boolean).length}</strong></div>
+      <div class="inspector-line"><span>Custom sections</span><strong>${state.data.customSections?.length || 0}</strong></div>
+      <div class="inspector-line"><span>Interaction mode</span><strong>${escapeHtml(state.libraries.status)}</strong></div>
+      <div class="inspector-copy">${escapeHtml(state.organizer.plan?.reasoning || 'No provider-backed layout plan has been applied in this session.')}</div>
+      <button class="button full" type="button" data-action="open-inspector" data-inspector-mode="libraries">Library status</button>
+    </div>`;
+}
+
+function renderAiInspector() {
+  const provider = state.data.providers.find((item) => item.status === 'configured');
+  return `
+    <div class="inspector-stack">
+      <div class="inspector-line"><span>Provider</span><strong>${escapeHtml(provider?.label || 'Not configured')}</strong></div>
+      <div class="inspector-line"><span>Model</span><strong>${escapeHtml(provider?.model || 'Setup required')}</strong></div>
+      <div class="inspector-copy">${provider ? 'Provider-backed actions are available. Review every proposed change before applying it.' : 'Set OpenAI, Anthropic, local, or custom provider credentials before running AI actions.'}</div>
+      <button class="button full" type="button" data-tab="ai">Open review</button>
+    </div>`;
+}
+
+function renderLibraryInspector() {
+  const status = [
+    ['Motion', Boolean(state.libraries.motion)],
+    ['Floating UI', Boolean(state.libraries.floating)],
+    ['Sortable', Boolean(state.libraries.sortable)],
+  ];
+  return `
+    <div class="inspector-stack">
+      ${status.map(([label, ready]) => `<div class="inspector-line"><span>${label}</span><strong>${ready ? 'enhanced' : 'fallback'}</strong></div>`).join('')}
+      <div class="inspector-copy">External interaction libraries are progressive. Lab Link keeps native behavior available when network access is unavailable.</div>
+    </div>`;
+}
+
+function renderIntegrationInspector() {
+  const selectedProvider = state.inspector.itemId || 'zoom';
+  return `
+    <div class="inspector-stack">
+      ${state.data.integrations.map((item) => `
+        <button class="integration-step" type="button" data-action="integration-oauth" data-provider="${escapeHtml(item.id)}">
+          <span>
+            <strong>${escapeHtml(item.label)}</strong>
+            <small>${escapeHtml(item.nextStep)}</small>
+          </span>
+          <em>${escapeHtml(item.status)}</em>
+        </button>
+      `).join('')}
+      <div class="oauth-exchange">
+        <div>
+          <div class="eyebrow">OAuth Exchange</div>
+          <p class="inspector-copy">Paste the returned authorization code for ${escapeHtml(selectedProvider)}. Tokens are stored only in the local ignored secrets file.</p>
+        </div>
+        ${state.integration.authorizationUrl ? `<a class="button full oauth-link" href="${escapeHtml(state.integration.authorizationUrl)}" target="_blank" rel="noreferrer">Open ${escapeHtml(state.integration.authorizationLabel || selectedProvider)} Consent</a>` : ''}
+        <input id="oauth-code" value="${escapeHtml(state.integration.oauthCode)}" placeholder="Authorization code">
+        <button class="button primary full" type="button" data-action="oauth-exchange" data-provider="${escapeHtml(selectedProvider)}" ${state.integration.busy ? 'disabled' : ''}>${state.integration.busy ? 'Exchanging' : 'Exchange Code'}</button>
+      </div>
+      <button class="button full" type="button" data-action="zoom-refresh">Refresh Zoom Token</button>
+    </div>`;
+}
+
+function renderCommandPalette() {
+  const indexedPresets = WORKSPACE_PRESETS.map((item, index) => ({ ...item, index }));
+  const integrationIndex = indexedPresets.length;
+  return `
+    <div class="palette-backdrop" data-action="close-command">
+      <section class="command-palette" data-animate role="dialog" aria-modal="true" aria-label="Command palette">
+        <div class="palette-head">
+          <input id="palette-input" value="${escapeHtml(state.organizer.intent)}" placeholder="Organize the lab around..." autofocus>
+          <button class="button primary" type="button" data-action="organize-workspace">Run</button>
+        </div>
+        <div class="palette-list">
+          ${indexedPresets.map((item) => `
+            <button class="palette-item ${state.paletteIndex === item.index ? 'active' : ''}" type="button" data-tab="${item.id}" data-palette-index="${item.index}">
+              <strong>${escapeHtml(item.label)}</strong>
+              <span>${escapeHtml(item.intent)}</span>
+            </button>
+          `).join('')}
+          <button class="palette-item ${state.paletteIndex === integrationIndex ? 'active' : ''}" type="button" data-action="open-inspector" data-inspector-mode="integrations" data-palette-index="${integrationIndex}">
+            <strong>Integration setup</strong>
+            <span>Open OAuth, token, email, calendar, and publishing helpers.</span>
+          </button>
+        </div>
+      </section>
+    </div>`;
 }
 
 async function refresh() {
@@ -972,6 +1197,7 @@ async function startZoom() {
 function applyOrganizerPlan(plan) {
   state.organizer.plan = plan;
   state.activeTab = plan.workspace || 'command';
+  if (Array.isArray(plan.orderedPanels)) state.panelOrder = normalizePanelOrder(plan.orderedPanels);
   const nextVisible = {};
   for (const key of Object.keys(PANEL_LABELS)) nextVisible[key] = false;
   for (const key of plan.visiblePanels || ['focus', 'tasks', 'sections']) {
@@ -983,6 +1209,70 @@ function applyOrganizerPlan(plan) {
   for (const key of plan.collapsedPanels || []) nextCollapsed[key] = true;
   state.collapsedPanels = nextCollapsed;
   savePrefs();
+}
+
+async function createIntegrationOauthUrl(provider) {
+  if (!provider) return;
+  state.integration.busy = provider;
+  state.inspector = { open: true, mode: 'integrations', itemId: provider };
+  render();
+  try {
+    const result = await api('/api/integrations/oauth-url', {
+      method: 'POST',
+      body: JSON.stringify({ provider }),
+    });
+    state.inspector = { open: true, mode: 'integrations', itemId: provider };
+    state.integration.authorizationUrl = result.authorizationUrl;
+    state.integration.authorizationLabel = result.label;
+    state.toast = `${result.label} authorization URL created.`;
+    window.open(result.authorizationUrl, '_blank', 'noopener,noreferrer');
+    render();
+  } catch (error) {
+    const required = error.payload?.required ? ` Required: ${error.payload.required.join(', ')}.` : '';
+    state.toast = `${error.message}${required}`;
+    render();
+  } finally {
+    state.integration.busy = null;
+    render();
+  }
+}
+
+async function refreshZoomToken() {
+  try {
+    const result = await api('/api/integrations/zoom/refresh', { method: 'POST', body: '{}' });
+    state.toast = `Zoom token refreshed. Expires in ${result.expiresIn || 3600}s.`;
+    await refresh();
+  } catch (error) {
+    const required = error.payload?.required ? ` Required: ${error.payload.required.join(', ')}.` : '';
+    state.toast = `${error.message}${required}`;
+    render();
+  }
+}
+
+async function exchangeOauthCode(provider) {
+  const code = state.integration.oauthCode.trim();
+  if (!provider || !code) {
+    state.toast = 'Choose an integration and paste the returned authorization code.';
+    render();
+    return;
+  }
+  state.integration.busy = provider;
+  render();
+  try {
+    const result = await api('/api/integrations/oauth/exchange', {
+      method: 'POST',
+      body: JSON.stringify({ provider, code }),
+    });
+    state.integration.oauthCode = '';
+    state.toast = `${result.label} token exchange completed.`;
+    await refresh();
+  } catch (error) {
+    const required = error.payload?.required ? ` Required: ${error.payload.required.join(', ')}.` : '';
+    state.toast = `${error.message}${required}`;
+  } finally {
+    state.integration.busy = null;
+    render();
+  }
 }
 
 async function organizeWorkspace() {
@@ -1034,6 +1324,24 @@ function applyEverythingPreset() {
   };
   savePrefs();
   state.toast = 'Full workspace preset applied.';
+  render();
+}
+
+function applyRolePreset(id) {
+  const preset = ROLE_PRESETS.find((item) => item.id === id);
+  if (!preset) return;
+  state.organizer.intent = preset.intent;
+  applyOrganizerPlan({
+    workspace: 'command',
+    focusTitle: preset.label,
+    focusBrief: preset.intent,
+    orderedPanels: DEFAULT_PANEL_ORDER,
+    visiblePanels: preset.panels,
+    collapsedPanels: preset.collapsed,
+    suggestedActions: preset.actions,
+    reasoning: `Applied ${preset.label} local role preset.`,
+  });
+  state.toast = `${preset.label} layout applied.`;
   render();
 }
 
@@ -1175,9 +1483,15 @@ function stopLiveNotes(showToast = true) {
 }
 
 function handleClick(event) {
+  if (event.target.classList.contains('palette-backdrop')) {
+    state.commandOpen = false;
+    render();
+    return;
+  }
   const tabButton = event.target.closest('[data-tab]');
   if (tabButton) {
     state.activeTab = tabButton.dataset.tab;
+    state.commandOpen = false;
     savePrefs();
     render();
     return;
@@ -1191,6 +1505,33 @@ function handleClick(event) {
   }
   const action = event.target.closest('[data-action]')?.dataset.action;
   if (!action) return;
+  if (action === 'toggle-command') {
+    state.commandOpen = !state.commandOpen;
+    state.paletteIndex = 0;
+    state.paletteFocusItems = false;
+    render();
+  }
+  if (action === 'close-command') {
+    state.commandOpen = false;
+    render();
+  }
+  if (action === 'open-inspector') {
+    const trigger = event.target.closest('[data-action]');
+    state.inspector = { open: true, mode: trigger.dataset.inspectorMode || 'context', itemId: trigger.dataset.itemId || null };
+    render();
+  }
+  if (action === 'close-inspector') {
+    state.inspector.open = false;
+    render();
+  }
+  if (action === 'inspect-panel') {
+    const trigger = event.target.closest('[data-action]');
+    state.inspector = { open: true, mode: trigger.dataset.panelId === 'integrations' ? 'integrations' : trigger.dataset.panelId === 'ai' ? 'ai' : 'context', itemId: trigger.dataset.panelId };
+    render();
+  }
+  if (action === 'integration-oauth') createIntegrationOauthUrl(event.target.closest('[data-provider]')?.dataset.provider);
+  if (action === 'oauth-exchange') exchangeOauthCode(event.target.closest('[data-provider]')?.dataset.provider);
+  if (action === 'zoom-refresh') refreshZoomToken();
   if (action === 'refresh') refresh().catch((error) => {
     state.toast = error.message;
     render();
@@ -1198,6 +1539,7 @@ function handleClick(event) {
   if (action === 'organize-workspace') organizeWorkspace();
   if (action === 'focus-preset') applyFocusPreset();
   if (action === 'everything-preset') applyEverythingPreset();
+  if (action === 'role-preset') applyRolePreset(event.target.closest('[data-role]')?.dataset.role);
   if (action === 'toggle-customize') {
     state.customize = !state.customize;
     savePrefs();
@@ -1217,6 +1559,14 @@ function handleClick(event) {
     state.density = state.density === 'compact' ? 'comfortable' : 'compact';
     savePrefs();
     render();
+  }
+  if (action === 'density-set') {
+    const next = event.target.closest('[data-density]')?.dataset.density;
+    if (['compact', 'comfortable'].includes(next)) {
+      state.density = next;
+      savePrefs();
+      render();
+    }
   }
   if (action === 'collapse-panel') {
     const id = event.target.closest('[data-panel-id]').dataset.panelId;
@@ -1241,6 +1591,7 @@ function handleClick(event) {
   if (action === 'stop-live') stopLiveNotes();
   if (action === 'reset-tabs') {
     state.tabOrder = TABS.map((tab) => tab.id);
+    state.panelOrder = [...DEFAULT_PANEL_ORDER];
     savePrefs();
     render();
   }
@@ -1289,6 +1640,10 @@ function handleInput(event) {
   if (event.target.id === 'organizer-intent') {
     state.organizer.intent = event.target.value;
   }
+  if (event.target.id === 'palette-input') {
+    state.organizer.intent = event.target.value;
+    state.paletteFocusItems = false;
+  }
   if (event.target.id === 'builder-goal') {
     state.builder.goal = event.target.value;
   }
@@ -1301,10 +1656,8 @@ function handleInput(event) {
   if (event.target.id === 'manual-purpose') {
     state.builder.manualPurpose = event.target.value;
   }
-  if (event.target.id === 'density') {
-    state.density = event.target.value;
-    savePrefs();
-    render();
+  if (event.target.id === 'oauth-code') {
+    state.integration.oauthCode = event.target.value;
   }
   if (event.target.matches('[data-feature]')) {
     state.visibleModules[event.target.dataset.feature] = event.target.checked;
@@ -1319,6 +1672,14 @@ function handleInput(event) {
 }
 
 function handleDragStart(event) {
+  const panel = event.target.closest('[data-panel]');
+  if (panel) {
+    dragTabId = `panel:${panel.dataset.panel}`;
+    panel.classList.add('dragging');
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', dragTabId);
+    return;
+  }
   const tab = event.target.closest('[data-tab]');
   if (!tab || !tab.classList.contains('workspace-tab')) return;
   dragTabId = tab.dataset.tab;
@@ -1328,16 +1689,32 @@ function handleDragStart(event) {
 }
 
 function handleDragEnd(event) {
+  const panel = event.target.closest('[data-panel]');
+  if (panel) panel.classList.remove('dragging');
   const tab = event.target.closest('[data-tab]');
   if (tab) tab.classList.remove('dragging');
   dragTabId = null;
 }
 
 function handleDragOver(event) {
-  if (event.target.closest('.workspace-tab')) event.preventDefault();
+  if (event.target.closest('.workspace-tab') || event.target.closest('[data-panel]')) event.preventDefault();
 }
 
 function handleDrop(event) {
+  const panelTarget = event.target.closest('[data-panel]');
+  if (panelTarget && dragTabId?.startsWith('panel:')) {
+    event.preventDefault();
+    const source = dragTabId.replace('panel:', '');
+    const target = panelTarget.dataset.panel;
+    if (source !== target) {
+      const next = state.panelOrder.filter((id) => id !== source);
+      next.splice(next.indexOf(target), 0, source);
+      state.panelOrder = normalizePanelOrder(next);
+      savePrefs();
+      render();
+    }
+    return;
+  }
   const target = event.target.closest('.workspace-tab');
   if (!target || !dragTabId) return;
   event.preventDefault();
@@ -1351,6 +1728,50 @@ function handleDrop(event) {
   render();
 }
 
+function afterRender() {
+  const motion = state.libraries.motion;
+  if (motion?.animate) {
+    document.querySelectorAll('[data-animate]').forEach((element) => {
+      if (element.dataset.animated === 'true') return;
+      element.dataset.animated = 'true';
+      motion.animate(element, { opacity: [0, 1], transform: ['translateY(8px)', 'translateY(0)'] }, { duration: 0.32, easing: [0.22, 1, 0.36, 1] });
+    });
+  }
+  const Sortable = state.libraries.sortable;
+  const container = document.querySelector('[data-sortable-panels]');
+  if (Sortable && container && !container.dataset.sortableReady) {
+    container.dataset.sortableReady = 'true';
+    state.sortableInstance?.destroy?.();
+    state.sortableInstance = Sortable.create(container, {
+      animation: 180,
+      handle: '.drag-handle',
+      ghostClass: 'drag-ghost',
+      onEnd: () => {
+        state.panelOrder = normalizePanelOrder([...container.querySelectorAll('[data-panel]')].map((item) => item.dataset.panel));
+        savePrefs();
+      },
+    });
+  }
+  const floating = state.libraries.floating;
+  const modeButton = document.querySelector('.mode-button');
+  const palette = document.querySelector('.command-palette');
+  if (floating?.computePosition && modeButton && palette) {
+    floating.computePosition(modeButton, palette, { placement: 'bottom-end' }).then(({ x, y }) => {
+      Object.assign(palette.style, { left: `${x}px`, top: `${y}px` });
+    });
+  }
+  if (state.commandOpen) {
+    const activePaletteItem = document.querySelector(`.palette-item[data-palette-index="${state.paletteIndex}"]`);
+    const paletteInput = document.querySelector('#palette-input');
+    if (state.paletteFocusItems) activePaletteItem?.focus();
+    else if (paletteInput && !paletteInput.dataset.focused) {
+      paletteInput.dataset.focused = 'true';
+      paletteInput.focus();
+      paletteInput.setSelectionRange?.(paletteInput.value.length, paletteInput.value.length);
+    }
+  }
+}
+
 document.addEventListener('click', handleClick);
 document.addEventListener('input', handleInput);
 document.addEventListener('change', handleInput);
@@ -1359,7 +1780,47 @@ document.addEventListener('dragend', handleDragEnd);
 document.addEventListener('dragover', handleDragOver);
 document.addEventListener('drop', handleDrop);
 document.addEventListener('keydown', (event) => {
-  if (event.target.matches('input, textarea, select')) return;
+  const target = event.target instanceof Element ? event.target : null;
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+    event.preventDefault();
+    state.commandOpen = true;
+    state.paletteIndex = 0;
+    state.paletteFocusItems = false;
+    render();
+    return;
+  }
+  if (event.key === 'Escape') {
+    if (state.commandOpen || state.inspector.open) {
+      event.preventDefault();
+      state.commandOpen = false;
+      state.inspector.open = false;
+      render();
+    }
+    return;
+  }
+  if (state.commandOpen) {
+    const items = [...document.querySelectorAll('.palette-item')];
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      if (!items.length) return;
+      event.preventDefault();
+      const direction = event.key === 'ArrowDown' ? 1 : -1;
+      state.paletteIndex = (state.paletteIndex + direction + items.length) % items.length;
+      state.paletteFocusItems = true;
+      render();
+      return;
+    }
+    if (event.key === 'Enter' && target?.id === 'palette-input') {
+      event.preventDefault();
+      organizeWorkspace();
+      return;
+    }
+    if (event.key === 'Enter' && items[state.paletteIndex]) {
+      event.preventDefault();
+      items[state.paletteIndex].click();
+      return;
+    }
+  }
+  if (target?.matches('input, textarea, select')) return;
   const tab = TABS.find((item) => item.key === event.key);
   if (tab) {
     state.activeTab = tab.id;
