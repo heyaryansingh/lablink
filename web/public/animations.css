@@ -1,0 +1,239 @@
+/* Lab Link V3 Animation System */
+
+/* Fade Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Slide Animations */
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Scale Animations */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes scaleOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+/* Pulse Animation */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Spin Animation */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Block Entrance (Staggered) */
+@keyframes blockEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Typing Effect */
+@keyframes typing {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+/* Shimmer Effect */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+/* Animation Utility Classes */
+.animate-fadeIn {
+  animation: fadeIn var(--duration-base) var(--ease-out);
+}
+
+.animate-fadeOut {
+  animation: fadeOut var(--duration-fast) var(--ease-in);
+}
+
+.animate-slideInUp {
+  animation: slideInUp var(--duration-base) var(--ease-out);
+}
+
+.animate-slideInDown {
+  animation: slideInDown var(--duration-base) var(--ease-out);
+}
+
+.animate-slideInLeft {
+  animation: slideInLeft var(--duration-base) var(--ease-out);
+}
+
+.animate-slideInRight {
+  animation: slideInRight var(--duration-base) var(--ease-out);
+}
+
+.animate-scaleIn {
+  animation: scaleIn var(--duration-base) var(--ease-out);
+}
+
+.animate-scaleOut {
+  animation: scaleOut var(--duration-fast) var(--ease-in);
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+.animate-blockEntrance {
+  animation: blockEntrance var(--duration-base) var(--ease-out);
+}
+
+/* Stagger Delays */
+.delay-50 { animation-delay: 50ms; }
+.delay-100 { animation-delay: 100ms; }
+.delay-150 { animation-delay: 150ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-250 { animation-delay: 250ms; }
+.delay-300 { animation-delay: 300ms; }
+
+/* Transition Utilities */
+.transition {
+  transition-property: all;
+  transition-timing-function: var(--ease-in-out);
+  transition-duration: var(--duration-base);
+}
+
+.transition-fast {
+  transition-duration: var(--duration-fast);
+}
+
+.transition-slow {
+  transition-duration: var(--duration-slow);
+}
+
+.transition-colors {
+  transition-property: color, background-color, border-color;
+}
+
+.transition-opacity {
+  transition-property: opacity;
+}
+
+.transition-transform {
+  transition-property: transform;
+}
+
+/* States */
+.is-loading {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.is-disabled {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.is-hidden {
+  display: none;
+}
+
+.is-visible {
+  display: block;
+}
