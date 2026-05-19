@@ -115,6 +115,18 @@
 - 09-02: CI workflow, linting, packaging.
 - 09-03: README, demo script, manual UAT checklist, release notes.
 
+## Phase 10: Web Platform
+
+**Goal:** Add a refined browser workspace while keeping the npm beta lightweight, honest, and configurable.
+
+**Plans:**
+
+- 10-01: PRD v2.4, original web shell, `lablink web`, Meeting Studio, real-provider AI route, Zoom creation route, integration readiness, web smoke checks.
+- 10-02: OAuth-backed Microsoft/Google/Zoom setup flows and saved layout presets.
+- 10-03: Lab profile customization, extension panels, and richer meeting-to-execution publishing.
+
+**Verification:** `lablink web --smoke`, `npm run web:smoke`, `npm run validate`, `npm run release:check`, and manual local browser review.
+
 ## Current Focus
 
-Phase 6 is active for the v2.3 real AI/action beta layer, then Phase 7 resumes institutional sync.
+Phase 10 is active for the v2.4 web platform beta while preserving the Phase 6 real-AI policy.

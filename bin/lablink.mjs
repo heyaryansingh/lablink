@@ -3,9 +3,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const VERSION = '0.1.0-beta.3';
+const VERSION = '0.1.0-beta.4';
 const APP_NAME = 'Lab Link';
 const SCHEMA_VERSION = 1;
 const DEFAULT_NOW = process.env.LABLINK_NOW || new Date().toISOString();
@@ -1645,6 +1645,8 @@ function check() {
   const packageJson = readJson(path.join(PROJECT_ROOT, 'package.json'), {});
   assert(packageJson.bin?.lablink, 'package bin exists');
   assert(fs.existsSync(path.join(PROJECT_ROOT, 'bin', 'lablink.mjs')), 'bootstrap runtime exists');
+  assert(fs.existsSync(path.join(PROJECT_ROOT, 'web', 'server.mjs')), 'web runtime exists');
+  assert(fs.existsSync(path.join(PROJECT_ROOT, 'web', 'public', 'index.html')), 'web app shell exists');
   assert(Number(process.versions.node.split('.')[0]) >= 20, 'Node.js >= 20');
   process.stdout.write('Static launch checks passed.\n');
 }
@@ -1676,6 +1678,7 @@ Usage:
   lablink ai reject <id>
   lablink schedule plan [--ai]
   lablink automation run [--ai]
+  lablink web [--port 4867]
   lablink sync
   lablink config path|show|get <path>|set <path> <value>
   lablink doctor
@@ -1710,6 +1713,10 @@ async function main() {
   if (command === 'check' || command === 'doctor') return check();
   if (command === 'test') return runTests();
   if (command === 'validate') return validate();
+  if (command === 'web') {
+    const webModule = await import(pathToFileURL(path.join(PROJECT_ROOT, 'web', 'server.mjs')).href);
+    return webModule.startWebServer({ args: args.slice(1), dataDir: options.dataDir });
+  }
   if (command === 'smoke') {
     const context = loadStore({ ...options, demo: true, fresh: true });
     process.stdout.write(`${render(context.store, { view: 'command' }, { width: 118, height: 34, color: false })}\n`);

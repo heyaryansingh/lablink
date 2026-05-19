@@ -95,6 +95,11 @@ try {
     throw new Error('Installed package smoke output did not include expected dashboard content.');
   }
 
+  const webSmoke = output(node, [cli, 'web', '--smoke', '--data-dir', dataDir], { cwd: appDir });
+  if (!webSmoke.includes('Web smoke passed')) {
+    throw new Error('Installed package web smoke did not pass.');
+  }
+
   const status = output(node, [cli, 'ai', 'status', '--data-dir', dataDir], { cwd: appDir });
   if (!status.includes('real provider required')) throw new Error('AI status did not make real-provider policy explicit.');
 

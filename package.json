@@ -1,6 +1,6 @@
 {
   "name": "lablink-cli",
-  "version": "0.1.0-beta.3",
+  "version": "0.1.0-beta.4",
   "description": "Local-first terminal operating system for research labs",
   "type": "module",
   "license": "MIT",
@@ -26,13 +26,15 @@
     "access": "public"
   },
   "bin": {
-    "lablink": "./bin/lablink.mjs"
+    "lablink": "bin/lablink.mjs"
   },
   "files": [
     "bin",
     "dist",
+    "web",
     "src/db/migrations",
     "docs/product/PRD_V2_3_REAL_AI_ACTIONS.md",
+    "docs/product/PRD_V2_4_WEB_PLATFORM.md",
     "README.md",
     "LICENSE"
   ],
@@ -44,6 +46,8 @@
     "build": "node bin/lablink.mjs build",
     "dev": "node bin/lablink.mjs demo",
     "demo": "node bin/lablink.mjs demo",
+    "web": "node bin/lablink.mjs web",
+    "web:smoke": "node bin/lablink.mjs web --smoke",
     "smoke": "node bin/lablink.mjs demo --snapshot --fresh",
     "init": "node bin/lablink.mjs init",
     "seed": "node bin/lablink.mjs seed",

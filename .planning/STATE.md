@@ -3,8 +3,8 @@
 ## Current Position
 
 - Date: 2026-05-18 America/Chicago
-- Phase: 6 - AI Layer
-- Plan: 06-01
+- Phase: 10 - Web Platform
+- Plan: 10-01
 - Status: Complete
 - Repository: standalone git repo initialized in `C:\Aryan\GitHub Projects\lablink`
 - Remote: `origin` configured as `https://github.com/heyaryansingh/lablink.git`
@@ -21,6 +21,7 @@
 - Local single-user is the first runtime, with server-ready boundaries.
 - PRD v2.2 is the active build-grade specification: `docs/product/PRD_V2_2.md`.
 - PRD v2.3 real AI/action layer is active for provider-backed beta work: `docs/product/PRD_V2_3_REAL_AI_ACTIONS.md`.
+- PRD v2.4 web platform is active for the browser workspace, meeting studio, and integration-readiness layer: `docs/product/PRD_V2_4_WEB_PLATFORM.md`.
 - PRD v2 remains the prior baseline specification: `docs/product/PRD_V2.md`.
 - PRD v2.1 launch spec is active for the npm-launch layer: `docs/product/PRD_V2_1_LAUNCH_SPEC.md`.
 - Capability gap tracking v2.2 is active: `docs/product/CAPABILITY_GAP_V2_2.md`.
@@ -45,6 +46,10 @@ Current AI/action completion promise:
 
 `LABLINK_REAL_AI_ACTIONS_BETA_READY`
 
+Current web platform completion promise:
+
+`LABLINK_WEB_PLATFORM_BETA_READY`
+
 ## Current Risks
 
 - Rich dependency installation was blocked earlier, so the launch path now uses a zero-dependency Node runtime.
@@ -53,10 +58,11 @@ Current AI/action completion promise:
 - The PRD examples include mojibake-rendered Unicode from PowerShell; implementation must use clean source strings and ASCII fallbacks.
 - OAuth credentials for Microsoft, Google, and Zoom are user/institution-specific; implementation can provide flows and config but cannot complete live authorization without credentials.
 - AI commands now require real OpenAI, Anthropic, local, or custom provider configuration; no-provider environments intentionally fail AI commands with setup instructions.
+- Website meeting analysis must keep the same policy: rules-based local extraction is allowed only when labeled, and real AI routes must fail without configured providers.
+- Zoom meeting creation must call a real configured Zoom token or fail with setup guidance; the web product must not invent meeting links.
 
 ## Next Actions
 
-- Build richer coordination objects around tasks, meetings, inbox, and follow-ups.
-- Publish beta after running `npm run release:check`.
-- Test real provider calls with `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`.
-- Continue institutional email/calendar, Slack, Notion, and lab-profile expansion.
+- Start the local web server for browser review.
+- Publish the beta after a final `npm run release:check` in the release environment.
+- Continue OAuth-backed Microsoft/Google/Zoom setup flows, saved layout presets, and richer meeting-to-execution publishing.

@@ -24,3 +24,5 @@ Build Lab Link according to `LABLINK_PRD.md` using layered GSD execution. After 
 | 2 | Foundation scaffold | `git diff --check`; non-ASCII scan; npm install attempt | Verify with blocker | Commit code, resolve npm install, run real validation |
 | 3 | Product definition | PRD v2 and gap matrix written | Complete | Commit PRD checkpoint |
 | 4 | Launchable bootstrap runtime | npm install, smoke, test, build, validate | Complete | Commit launch runtime |
+| 5 | Real AI/action beta | `npm run validate`; `npm run release:check` | Complete | Keep no-provider failures honest |
+| 6 | Web platform beta | `lablink web --smoke`; `npm run validate`; `npm run release:check`; local HTTP check | Complete | Start server for review, then continue OAuth/provider hardening |
