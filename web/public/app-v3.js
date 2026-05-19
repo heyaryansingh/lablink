@@ -10,6 +10,10 @@ import './blocks/lab-priority-queue.js';
 import './blocks/lab-meeting-studio.js';
 import './blocks/lab-experiment-readiness.js';
 import './blocks/lab-ai-review.js';
+import './blocks/lab-equipment-tracker.js';
+import './blocks/lab-sample-pipeline.js';
+import './blocks/lab-reagent-watch.js';
+import './blocks/lab-safety-checklist.js';
 
 /**
  * Lab Link V3 Application
