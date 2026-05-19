@@ -65,6 +65,8 @@ npm run release:check
 npm run smoke
 npm run web
 npm run web:smoke
+npm run repo:scan
+npm run repo:scan:full
 npm run validate
 npm run dev
 npm run demo
@@ -104,6 +106,16 @@ Run the full package release check before publishing:
 ```bash
 npm run release:check
 ```
+
+When another developer or agent changes the repo, run the repo guard before continuing:
+
+```bash
+npm run repo:scan
+npm run repo:scan:full
+node bin/lablink.mjs repo scan --json
+```
+
+The guard reports git status, changed-file risk, launch-critical syntax checks, web smoke, and full validation in `--full` mode. It never resets, commits, or pushes changes.
 
 Run locally:
 

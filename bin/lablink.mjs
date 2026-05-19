@@ -3,9 +3,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const VERSION = '0.1.0-beta.8';
+const VERSION = '0.1.0-beta.9';
 const APP_NAME = 'Lab Link';
 const SCHEMA_VERSION = 1;
 const DEFAULT_NOW = process.env.LABLINK_NOW || new Date().toISOString();
@@ -1616,6 +1617,8 @@ function runTests() {
   assert(context.store.providers.every((provider) => ['openai', 'anthropic', 'local', 'custom'].includes(provider.id)), 'only real AI provider slots are registered');
   assert(aiStatusText(context.store).includes('real provider required'), 'AI status states real-provider policy');
   assert(planSchedule(context.store).length > 0, 'rules-based schedule plan creates blocks');
+  assert(classifyRepoPath('web/public/app.js') === 'high', 'repo guard classifies web app as high risk');
+  assert(classifyRepoPath('docs/product/PRD.md') === 'planning', 'repo guard classifies product docs as planning risk');
   const suggestions = createSuggestionsFromTranscript('Jordan will check AT8 suppliers.\nDecision: use cohort 2 for imaging.\nRisk: library QC is delayed.', 'test');
   assert(suggestions.length >= 3, 'transcript extraction creates suggestions');
   assert(suggestions.some((item) => item.type === 'task'), 'task suggestion exists');
@@ -1661,6 +1664,152 @@ function validate() {
   process.stdout.write('Validation complete.\n');
 }
 
+function commandSpec(command, args) {
+  if (process.platform === 'win32' && command === 'npm') {
+    return {
+      command: process.env.ComSpec || 'cmd.exe',
+      args: ['/d', '/s', '/c', 'npm', ...args],
+    };
+  }
+  return { command, args };
+}
+
+function runCapture(command, args, cwd) {
+  const spec = commandSpec(command, args);
+  const result = spawnSync(spec.command, spec.args, {
+    cwd,
+    encoding: 'utf8',
+    shell: false,
+    env: process.env,
+  });
+  return {
+    command: `${command} ${args.join(' ')}`,
+    status: result.status ?? 1,
+    stdout: result.stdout || '',
+    stderr: result.stderr || '',
+    ok: result.status === 0,
+  };
+}
+
+function findRepoRoot(start = process.cwd()) {
+  let current = path.resolve(start);
+  while (true) {
+    if (fs.existsSync(path.join(current, '.git'))) return current;
+    const parent = path.dirname(current);
+    if (parent === current) return null;
+    current = parent;
+  }
+}
+
+function classifyRepoPath(file) {
+  const normalized = String(file || '').replace(/\\/g, '/');
+  const highRisk = [
+    /^bin\/lablink\.mjs$/,
+    /^web\/server\.mjs$/,
+    /^web\/public\/app\.js$/,
+    /^web\/public\/styles\.css$/,
+    /^package\.json$/,
+    /^package-lock\.json$/,
+    /^\.env\.example$/,
+    /^scripts\//,
+    /^src\/db\/migrations\//,
+  ];
+  const planning = [
+    /^docs\/product\//,
+    /^\.planning\//,
+    /^README\.md$/,
+  ];
+  if (highRisk.some((pattern) => pattern.test(normalized))) return 'high';
+  if (planning.some((pattern) => pattern.test(normalized))) return 'planning';
+  return 'normal';
+}
+
+function parseGitStatus(raw) {
+  const lines = raw.split(/\r?\n/).filter(Boolean);
+  const branch = lines.find((line) => line.startsWith('##')) || '## unknown';
+  const changes = lines
+    .filter((line) => !line.startsWith('##'))
+    .map((line) => {
+      const status = line.slice(0, 2).trim() || '??';
+      const rawPath = line.slice(3).trim();
+      const file = rawPath.includes(' -> ') ? rawPath.split(' -> ').pop() : rawPath;
+      return { status, file, risk: classifyRepoPath(file) };
+    });
+  return { branch, changes };
+}
+
+function repoCheck(command, args, cwd) {
+  const result = runCapture(command, args, cwd);
+  return {
+    name: `${command} ${args.join(' ')}`,
+    ok: result.ok,
+    status: result.status,
+    output: truncate(`${result.stdout}${result.stderr}`.replace(/\s+/g, ' ').trim(), 500),
+  };
+}
+
+function runRepoScan(args = []) {
+  const json = args.includes('--json');
+  const full = args.includes('--full');
+  const release = args.includes('--release');
+  const noChecks = args.includes('--no-checks');
+  const root = findRepoRoot(process.cwd()) || process.cwd();
+  const statusResult = runCapture('git', ['-c', 'core.excludesfile=', 'status', '--short', '--branch'], root);
+  const logResult = runCapture('git', ['log', '-1', '--oneline'], root);
+  const parsed = statusResult.ok ? parseGitStatus(statusResult.stdout) : { branch: '## git unavailable', changes: [] };
+  const checks = [];
+  const packageJson = path.join(root, 'package.json');
+
+  if (!noChecks) {
+    for (const file of ['bin/lablink.mjs', 'web/server.mjs', 'web/public/app.js']) {
+      if (fs.existsSync(path.join(root, file))) checks.push(repoCheck(process.execPath, ['--check', file], root));
+    }
+    if (fs.existsSync(packageJson)) checks.push(repoCheck('npm', ['run', 'web:smoke'], root));
+    if (full && fs.existsSync(packageJson)) checks.push(repoCheck('npm', ['run', 'validate'], root));
+    if (release && fs.existsSync(packageJson)) checks.push(repoCheck('npm', ['run', 'release:check'], root));
+  }
+
+  const summary = {
+    root,
+    branch: parsed.branch.replace(/^##\s*/, ''),
+    latestCommit: logResult.ok ? logResult.stdout.trim() : 'unavailable',
+    clean: parsed.changes.length === 0,
+    changes: parsed.changes,
+    highRiskChanges: parsed.changes.filter((change) => change.risk === 'high'),
+    planningChanges: parsed.changes.filter((change) => change.risk === 'planning'),
+    checks,
+    ok: checks.every((check) => check.ok),
+  };
+
+  if (json) {
+    process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
+  } else {
+    process.stdout.write('Lab Link Repo Scan\n');
+    process.stdout.write(`Root: ${summary.root}\n`);
+    process.stdout.write(`Branch: ${summary.branch}\n`);
+    process.stdout.write(`Latest: ${summary.latestCommit}\n`);
+    process.stdout.write(`Status: ${summary.clean ? 'clean' : `${summary.changes.length} changed file(s)`}\n`);
+    if (summary.changes.length) {
+      process.stdout.write('Changed files:\n');
+      for (const change of summary.changes) {
+        process.stdout.write(`  ${change.status.padEnd(2)} ${change.file} [${change.risk}]\n`);
+      }
+    }
+    if (checks.length) {
+      process.stdout.write('Checks:\n');
+      for (const checkItem of checks) {
+        process.stdout.write(`  ${checkItem.ok ? 'pass' : 'fail'} ${checkItem.name}\n`);
+        if (!checkItem.ok && checkItem.output) process.stdout.write(`    ${checkItem.output}\n`);
+      }
+    } else {
+      process.stdout.write('Checks: skipped\n');
+    }
+    process.stdout.write(`Result: ${summary.ok ? 'pass' : 'fail'}\n`);
+  }
+
+  if (!summary.ok) throw new Error('Repo scan checks failed.');
+}
+
 function printHelp() {
   process.stdout.write(`${APP_NAME} ${VERSION}
 
@@ -1680,6 +1829,7 @@ Usage:
   lablink automation run [--ai]
   lablink web [--port 4867]
   lablink sync
+  lablink repo scan [--full|--json|--no-checks]
   lablink config path|show|get <path>|set <path> <value>
   lablink doctor
   lablink --version
@@ -1723,6 +1873,8 @@ async function main() {
     return;
   }
   if (command === 'config') return handleConfigCommand(args, options);
+  if (command === 'repo' && args[1] === 'scan') return runRepoScan(args.slice(2));
+  if (command === 'guard') return runRepoScan(args.slice(1));
   if (command === 'init' || command === 'seed') {
     const context = loadStore({ ...options, demo: options.demo || command === 'seed' });
     saveStore(context);
