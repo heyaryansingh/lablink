@@ -3,25 +3,25 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Lab Link Web</title>
-    <link rel="stylesheet" href="/styles.css">
-    <script defer src="/app.js"></script>
+    <title>Lab Link V3</title>
+
+    <!-- V3 Design System -->
+    <link rel="stylesheet" href="/design-system.css">
+    <link rel="stylesheet" href="/animations.css">
+
+    <!-- V3 Application -->
+    <script type="module" src="/app-v3.js"></script>
   </head>
   <body>
-    <div id="app" class="app-shell" aria-live="polite">
-      <header class="topbar boot-topbar">
-        <div class="brand-button">
-          <div class="product-mark">Lab Link</div>
-          <div class="muted small">Loading local workspace</div>
+    <div id="app" aria-live="polite">
+      <!-- Loading state -->
+      <div class="workspace" style="min-height: 100vh; background-color: var(--surface-bg); padding: var(--space-6); display: flex; align-items: center; justify-content: center;">
+        <div style="text-align: center;">
+          <div class="skeleton-pulse" style="width: 60px; height: 60px; border-radius: var(--radius-full); margin: 0 auto var(--space-4);"></div>
+          <div class="skeleton-line" style="width: 200px; height: 20px; margin: 0 auto var(--space-2);"></div>
+          <div class="skeleton-line" style="width: 150px; height: 16px; margin: 0 auto;"></div>
         </div>
-      </header>
-      <main class="boot-panel refined-boot">
-        <div class="skeleton-hero"></div>
-        <div class="skeleton-line wide"></div>
-        <div class="skeleton-block-grid">
-          <span></span><span></span><span></span><span></span>
-        </div>
-      </main>
+      </div>
     </div>
   </body>
 </html>
