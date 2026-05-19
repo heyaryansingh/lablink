@@ -1503,8 +1503,17 @@ function runWebSmoke(args = []) {
   const index = fs.readFileSync(path.join(PUBLIC_DIR, 'index.html'), 'utf8');
   const css = fs.readFileSync(path.join(PUBLIC_DIR, 'styles.css'), 'utf8');
   const js = fs.readFileSync(path.join(PUBLIC_DIR, 'app.js'), 'utf8');
+  const appV3 = fs.readFileSync(path.join(PUBLIC_DIR, 'app-v3.js'), 'utf8');
+  const designSystem = fs.readFileSync(path.join(PUBLIC_DIR, 'design-system.css'), 'utf8');
   assert(index.includes('Lab Link'), 'index includes product name');
   assert(css.includes('--canvas'), 'styles define design tokens');
+  assert(index.includes('/app-v3.js'), 'index launches the V3 app shell');
+  assert(appV3.includes('renderFocusBoard'), 'V3 app renders a dashboard-first focus board');
+  assert(appV3.includes('Workspace Studio'), 'V3 app separates AI customization into Workspace Studio');
+  assert(appV3.includes('uniqueKnownBlocks'), 'V3 app normalizes saved and AI block layouts');
+  assert(appV3.includes('BLOCK_MANIFESTS'), 'V3 app uses manifests directly for block rendering');
+  assert(designSystem.includes('.lab-dashboard-grid'), 'design system includes dashboard layout styles');
+  assert(designSystem.includes('.workspace-studio'), 'design system includes Workspace Studio styles');
   assert(js.includes('SpeechRecognition'), 'client includes live notes capability check');
   assert(js.includes('Lab Builder'), 'client includes adaptive Lab Builder');
   assert(js.includes('@motionone/dom'), 'client progressively loads Motion One');

@@ -6,7 +6,7 @@ import readline from 'node:readline';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const VERSION = '0.1.0-beta.9';
+const VERSION = '0.1.0-beta.10';
 const APP_NAME = 'Lab Link';
 const SCHEMA_VERSION = 1;
 const DEFAULT_NOW = process.env.LABLINK_NOW || new Date().toISOString();

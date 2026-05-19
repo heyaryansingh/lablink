@@ -26,3 +26,4 @@ Build Lab Link according to `LABLINK_PRD.md` using layered GSD execution. After 
 | 4 | Launchable bootstrap runtime | npm install, smoke, test, build, validate | Complete | Commit launch runtime |
 | 5 | Real AI/action beta | `npm run validate`; `npm run release:check` | Complete | Keep no-provider failures honest |
 | 6 | Web platform beta | `lablink web --smoke`; `npm run validate`; `npm run release:check`; local HTTP check | Complete | Start server for review, then continue OAuth/provider hardening |
+| 7 | V3.1 dashboard-first repair | PRD written; app shell rebuilt; pending repo scan/full release validation | In progress | Validate launch path, remove blank-dashboard failure, commit |

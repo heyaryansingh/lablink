@@ -95,7 +95,7 @@ node bin/lablink.mjs web --port 4867
 The bootstrap runtime includes Command Center, Today, Projects, Meetings, AI Review, Settings, transcript import, rules-based review suggestions, AI suggestion approve/reject commands, and a local browser workspace.
 Transcript import and default schedule/progress flows use labeled rules-based automation unless you run the `--ai` provider-backed commands.
 
-The browser workspace includes a modular Lab Blocks Runtime with workspace tabs, draggable blocks, per-block subtabs, role presets, optional inspector sheet, Meeting Studio, browser live-note capture when supported, rules-based meeting extraction, real-provider meeting analysis, Zoom creation setup, OAuth URL/code-exchange helpers, and layout preferences saved in browser storage.
+The browser workspace now opens on a dashboard-first lab command view with priorities, risks, meetings, projects, integration status, and modular lab blocks front and center. Workspace Studio handles AI organization, AI section proposals, manual custom sections, block visibility, and subtab preferences so customization is powerful without replacing the operational dashboard.
 
 The web beta also includes Lab Builder, an adaptive workspace composer. It can save local custom lab sections manually, or use a configured real AI provider to propose new section designs for things like reagent tracking, protocol readiness, equipment coordination, grants, onboarding, or lab-specific review queues. Provider-backed section generation fails with setup guidance if no real AI provider is configured.
 

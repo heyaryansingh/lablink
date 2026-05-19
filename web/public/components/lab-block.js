@@ -49,6 +49,7 @@ export class LabBlock extends HTMLElement {
 
     // Render initial state
     this.render();
+    this.applySharedStyles();
 
     // Emit mounted event
     eventBus.emit(EVENTS.BLOCK_MOUNTED, {
@@ -95,6 +96,7 @@ export class LabBlock extends HTMLElement {
     if (this._isMounted) {
       this.onPropsChanged(name, oldValue, newValue);
       this.render();
+      this.applySharedStyles();
     }
   }
 
@@ -159,6 +161,7 @@ export class LabBlock extends HTMLElement {
 
     if (this._isMounted) {
       this.render();
+      this.applySharedStyles();
 
       eventBus.emit(EVENTS.BLOCK_UPDATED, {
         blockId: this.manifest.id,
@@ -182,6 +185,7 @@ export class LabBlock extends HTMLElement {
   setLoading(isLoading) {
     this._isLoading = isLoading;
     this.render();
+    this.applySharedStyles();
   }
 
   /**
@@ -191,6 +195,7 @@ export class LabBlock extends HTMLElement {
   setError(error) {
     this._error = error;
     this.render();
+    this.applySharedStyles();
 
     if (error) {
       eventBus.emit(EVENTS.ERROR_OCCURRED, {
@@ -371,16 +376,45 @@ export class LabBlock extends HTMLElement {
    * Apply shared styles to shadow DOM
    */
   applySharedStyles() {
-    const linkDesignSystem = document.createElement('link');
-    linkDesignSystem.rel = 'stylesheet';
-    linkDesignSystem.href = '/design-system.css';
+    const cssText = `
+      :host { display:block; min-height:100%; font-family: var(--font-sans); color: var(--text-primary); }
+      *, *::before, *::after { box-sizing:border-box; }
+      .btn { display:inline-flex; align-items:center; justify-content:center; gap:var(--space-2); min-height:34px; padding:0 var(--space-3); border:1px solid transparent; border-radius:var(--radius-md); font:inherit; font-size:var(--text-sm); font-weight:var(--font-weight-medium); cursor:pointer; transition:background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out); }
+      .btn:hover:not(:disabled) { transform:translateY(-1px); }
+      .btn:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+      .btn-primary { background:hsl(218, 32%, 14%); border-color:hsl(218, 32%, 14%); color:white; }
+      .btn-secondary { background:white; border-color:var(--border-default); color:var(--text-primary); }
+      .btn-sm { min-height:30px; padding:0 var(--space-3); font-size:var(--text-xs); }
+      .input { width:100%; padding:var(--space-3); border:1px solid var(--border-default); border-radius:var(--radius-md); background:white; color:var(--text-primary); font:inherit; font-size:var(--text-sm); line-height:var(--line-height-normal); }
+      .input:focus, .btn:focus { outline:none; border-color:var(--border-focus); box-shadow:0 0 0 3px hsla(210, 95%, 50%, .15); }
+      .badge { display:inline-flex; align-items:center; min-height:24px; padding:0 var(--space-2); border-radius:var(--radius-full); background:var(--color-neutral-100); color:var(--text-secondary); font-size:var(--text-xs); font-weight:var(--font-weight-semibold); text-transform:capitalize; }
+      .badge-primary { background:var(--color-primary-100); color:var(--color-primary-700); }
+      .badge-success { background:hsl(145, 60%, 90%); color:var(--color-success-600); }
+      .badge-warning { background:hsl(35, 90%, 90%); color:var(--color-warning-600); }
+      .badge-error { background:hsl(0, 70%, 92%); color:var(--color-error-600); }
+      .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+      .line-clamp-3 { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+      .skeleton { background:linear-gradient(90deg, var(--color-neutral-200), var(--color-neutral-100), var(--color-neutral-200)); background-size:200% 100%; animation:skeleton-loading 1.5s ease-in-out infinite; border-radius:var(--radius-md); }
+      @keyframes skeleton-loading { 0% { background-position:200% 0; } 100% { background-position:-200% 0; } }
+    `;
 
-    const linkAnimations = document.createElement('link');
-    linkAnimations.rel = 'stylesheet';
-    linkAnimations.href = '/animations.css';
+    if ('adoptedStyleSheets' in Document.prototype && 'replaceSync' in CSSStyleSheet.prototype) {
+      if (!LabBlock.sharedSheet) {
+        LabBlock.sharedSheet = new CSSStyleSheet();
+        LabBlock.sharedSheet.replaceSync(cssText);
+      }
+      if (!this.shadowRoot.adoptedStyleSheets.includes(LabBlock.sharedSheet)) {
+        this.shadowRoot.adoptedStyleSheets = [LabBlock.sharedSheet, ...this.shadowRoot.adoptedStyleSheets];
+      }
+      return;
+    }
 
-    this.shadowRoot.appendChild(linkDesignSystem);
-    this.shadowRoot.appendChild(linkAnimations);
+    if (!this.shadowRoot.querySelector('style[data-lablink-shared]')) {
+      const style = document.createElement('style');
+      style.dataset.lablinkShared = 'true';
+      style.textContent = cssText;
+      this.shadowRoot.prepend(style);
+    }
   }
 }
 

@@ -12,6 +12,19 @@ class StreamingAIService {
     this.requestId = 0;
   }
 
+  parseErrorEvent(event, fallback = 'Stream connection error') {
+    if (!event?.data) return fallback;
+    try {
+      const data = JSON.parse(event.data);
+      const required = Array.isArray(data.required) && data.required.length
+        ? ` Required: ${data.required.join(', ')}.`
+        : '';
+      return `${data.error || fallback}${required}`;
+    } catch {
+      return fallback;
+    }
+  }
+
   /**
    * Stream AI organize workspace
    * @param {string} intent - User intent for organization
@@ -56,7 +69,7 @@ class StreamingAIService {
 
       // Handle errors
       eventSource.addEventListener('error', (e) => {
-        const errorMessage = e.data ? JSON.parse(e.data).error : 'Stream connection error';
+        const errorMessage = this.parseErrorEvent(e);
         const error = new Error(errorMessage);
         if (onError) onError(error);
         eventBus.emit(EVENTS.AI_STREAM_ERROR, { requestId, error });
@@ -195,7 +208,7 @@ class StreamingAIService {
       });
 
       eventSource.addEventListener('error', (e) => {
-        const errorMessage = e.data ? JSON.parse(e.data).error : 'Stream connection error';
+        const errorMessage = this.parseErrorEvent(e);
         const error = new Error(errorMessage);
         if (onError) onError(error);
         eventBus.emit(EVENTS.AI_STREAM_ERROR, { requestId, error });

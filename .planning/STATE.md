@@ -24,6 +24,7 @@
 - PRD v2.4 web platform is active for the browser workspace, meeting studio, and integration-readiness layer: `docs/product/PRD_V2_4_WEB_PLATFORM.md`.
 - PRD v2.7 modular block workspace is active for the tabbed Lab Blocks Runtime: `docs/product/PRD_V2_7_MODULAR_BLOCK_WORKSPACE.md`.
 - PRD v2.8 collaborative repo guard is active for multi-agent scanning and validation: `docs/product/PRD_V2_8_COLLABORATIVE_REPO_GUARD.md`.
+- PRD v3.1 dashboard-first workspace repair is active for the web app shell: `docs/product/PRD_V3_1_DASHBOARD_FIRST_WORKSPACE.md`.
 - PRD v2 remains the prior baseline specification: `docs/product/PRD_V2.md`.
 - PRD v2.1 launch spec is active for the npm-launch layer: `docs/product/PRD_V2_1_LAUNCH_SPEC.md`.
 - Capability gap tracking v2.2 is active: `docs/product/CAPABILITY_GAP_V2_2.md`.
@@ -61,6 +62,10 @@ Current V3 foundation completion promises:
 `LABLINK_V3_BLOCK_REGISTRY_COMPLETE`
 `LABLINK_V3_STREAMING_UI_COMPLETE`
 
+Current V3.1 dashboard completion promise:
+
+`LABLINK_V3_1_DASHBOARD_FIRST_WORKSPACE`
+
 ## Current Risks
 
 - Rich dependency installation was blocked earlier, so the launch path now uses a zero-dependency Node runtime.
@@ -77,6 +82,7 @@ Current V3 foundation completion promises:
 - The refined v2.6 browser should avoid native-looking primary dropdowns and dashboard walls: command composer, focus canvas, adaptive sections, role presets, inspector sheet, progressive Motion/Floating UI/Sortable enhancement, guided OAuth URL/code-exchange helpers, and real-provider AI organization are the current interaction model.
 - The v2.7 browser restores the modular block design: workspace tabs, draggable lab blocks, per-block subtabs, animated organize loading, AI-controlled block plans, and manual block controls.
 - The v2.8 repo guard adds `lablink repo scan` and npm scripts to detect outside edits, classify risk, and run syntax/web/full validation without destructive git operations.
+- The v3.1 browser must open on comprehensive lab dashboards first; AI organize, AI section generation, block toggles, and subtab tuning now belong in Workspace Studio so AI is powerful without being the entire first screen.
 
 ## V3 Implementation Progress
 

@@ -1,4 +1,4 @@
-// Lab Link V3 - Meeting Studio Block
+﻿// Lab Link V3 - Meeting Studio Block
 
 import LabBlock from '../components/lab-block.js';
 import { MEETING_STUDIO_MANIFEST } from '../registry/block-manifests.js';
@@ -374,13 +374,16 @@ class LabMeetingStudio extends LabBlock {
     const recordButton = this.createElement('button', {
       className: this.state.isRecording ? 'btn btn-secondary btn-sm' : 'btn btn-primary btn-sm',
       onClick: () => this.state.isRecording ? this.handleStopRecording() : this.handleStartRecording(),
-    }, this.state.isRecording ? '⏹ Stop Recording' : '🎤 Start Recording');
+    }, this.state.isRecording ? 'Stop Recording' : 'Start Recording');
 
     const analyzeButton = this.createElement('button', {
       className: 'btn btn-primary btn-sm',
       onClick: () => this.handleAnalyzeAI(),
       disabled: this.state.isAnalyzing || !this.state.transcript,
-    }, this.state.isAnalyzing ? 'Analyzing...' : '✨ Analyze with AI');
+    }, this.state.isAnalyzing ? 'Analyzing...' : 'Analyze with AI');
+
+    recordButton.textContent = this.state.isRecording ? 'Stop Recording' : 'Start Recording';
+    analyzeButton.textContent = this.state.isAnalyzing ? 'Analyzing...' : 'Analyze with AI';
 
     toolbar.appendChild(recordButton);
     toolbar.appendChild(analyzeButton);
