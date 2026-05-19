@@ -14,6 +14,10 @@ import './blocks/lab-equipment-tracker.js';
 import './blocks/lab-sample-pipeline.js';
 import './blocks/lab-reagent-watch.js';
 import './blocks/lab-safety-checklist.js';
+import './blocks/lab-team-coordination.js';
+import './blocks/lab-grant-milestones.js';
+import './blocks/lab-risk-radar.js';
+import './blocks/lab-data-pipeline.js';
 
 /**
  * Lab Link V3 Application
