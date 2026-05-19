@@ -1303,43 +1303,14 @@ async function handleStreamOrganize(request, response, context) {
 
   try {
     const store = loadStore(context.dataDir);
+    const started = Date.now();
 
     sendSSEEvent(response, 'start', { id: `org-${Date.now()}`, timestamp: Date.now() });
-
-    // Check if AI provider is configured
-    const provider = resolveProvider(store, context.env);
-    if (!provider.available) {
-      sendSSEEvent(response, 'error', {
-        error: 'No AI provider configured. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY.'
-      });
-      response.end();
-      return;
-    }
-
-    // Simulate streaming response (in real implementation, this would call AI provider)
-    const tokens = ['Analyzing', ' workspace', '...', '\n\n', 'Organizing', ' blocks', ' by', ' priority', '...'];
-    for (let i = 0; i < tokens.length; i++) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-      sendSSEEvent(response, 'token', { token: tokens[i] });
-      sendSSEEvent(response, 'progress', { progress: (i + 1) / tokens.length, message: 'Organizing workspace' });
-    }
-
-    // Send result
-    const result = {
-      workspace: 'command',
-      focusTitle: intent,
-      visibleBlocks: ['priority-queue', 'experiment-readiness', 'meeting-studio'],
-      orderedBlocks: ['priority-queue', 'experiment-readiness', 'meeting-studio', 'reagent-watch'],
-      collapsedBlocks: [],
-      blockSubtabs: {
-        'priority-queue': 'today',
-        'experiment-readiness': 'protocols',
-      },
-      rationale: 'Organized workspace based on current priorities and active work.',
-    };
-
+    sendSSEEvent(response, 'progress', { progress: 0.2, message: 'Calling configured AI provider' });
+    const result = await organizeWorkspace(store, { intent }, context.env);
+    sendSSEEvent(response, 'progress', { progress: 0.9, message: 'Applying provider layout' });
     sendSSEEvent(response, 'result', result);
-    sendSSEEvent(response, 'complete', { id: `org-${Date.now()}`, duration: 900 });
+    sendSSEEvent(response, 'complete', { id: `org-${Date.now()}`, duration: Date.now() - started, provider: result.provider });
     response.end();
 
   } catch (error) {
@@ -1350,47 +1321,21 @@ async function handleStreamOrganize(request, response, context) {
 
 async function handleStreamMeetingAnalysis(request, response, context) {
   const body = await readBody(request);
-  const transcript = body.transcript || '';
 
-  response.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-  });
+  initSSEResponse(response);
 
   try {
     const store = loadStore(context.dataDir);
-    const provider = resolveProvider(store, context.env);
-
-    if (!provider.available) {
-      response.write(`event: error\ndata: ${JSON.stringify({ error: 'No AI provider configured' })}\n\n`);
-      response.end();
-      return;
-    }
-
-    response.write(`event: start\ndata: ${JSON.stringify({ id: `meeting-${Date.now()}` })}\n\n`);
-
-    // Simulate streaming
-    const tokens = ['Analyzing', ' meeting', ' transcript', '...\n\n', 'Action', ' items:', ' '];
-    for (const token of tokens) {
-      await new Promise(resolve => setTimeout(resolve, 80));
-      response.write(`event: token\ndata: ${JSON.stringify({ token })}\n\n`);
-    }
-
-    // Send result
-    const result = {
-      actionItems: extractMeetingRules({ transcript }).actions,
-      risks: extractMeetingRules({ transcript }).risks,
-      decisions: [],
-      summary: 'Meeting analyzed successfully.',
-    };
-
-    response.write(`event: result\ndata: ${JSON.stringify(result)}\n\n`);
-    response.write(`event: complete\ndata: ${JSON.stringify({ duration: 640 })}\n\n`);
+    const started = Date.now();
+    sendSSEEvent(response, 'start', { id: `meeting-${Date.now()}` });
+    sendSSEEvent(response, 'progress', { progress: 0.2, message: 'Calling configured AI provider' });
+    const result = await analyzeMeeting(store, body, context.env);
+    sendSSEEvent(response, 'result', result);
+    sendSSEEvent(response, 'complete', { duration: Date.now() - started, provider: result.provider });
     response.end();
 
   } catch (error) {
-    response.write(`event: error\ndata: ${JSON.stringify({ error: error.message })}\n\n`);
+    sendSSEEvent(response, 'error', { error: error.message, required: error.details?.required || [] });
     response.end();
   }
 }
@@ -1404,41 +1349,16 @@ async function handleStreamSectionProposal(request, response, context) {
 
   try {
     const store = loadStore(context.dataDir);
-    const provider = resolveProvider(store, context.env);
-
-    if (!provider.available) {
-      sendSSEEvent(response, 'error', { error: 'No AI provider configured' });
-      response.end();
-      return;
-    }
-
+    const started = Date.now();
     sendSSEEvent(response, 'start', { id: `section-${Date.now()}` });
-
-    // Simulate streaming
-    const tokens = ['Creating', ' custom', ' section', ' for', ':', ' ', goal];
-    for (const token of tokens) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-      sendSSEEvent(response, 'token', { token });
-    }
-
-    // Send result
-    const result = {
-      id: `custom-${Date.now()}`,
-      title: goal,
-      purpose: `Custom section for ${goal}`,
-      fields: [
-        { name: 'status', type: 'select', options: ['pending', 'active', 'complete'] },
-        { name: 'notes', type: 'textarea' },
-      ],
-      createdBy: 'ai',
-    };
-
+    sendSSEEvent(response, 'progress', { progress: 0.2, message: 'Calling configured AI provider' });
+    const result = await proposeWorkspaceSection(store, { goal, labProfile }, context.env);
     sendSSEEvent(response, 'result', result);
-    sendSSEEvent(response, 'complete', { duration: 700 });
+    sendSSEEvent(response, 'complete', { duration: Date.now() - started, provider: result.provider });
     response.end();
 
   } catch (error) {
-    sendSSEEvent(response, 'error', { error: error.message });
+    sendSSEEvent(response, 'error', { error: error.message, required: error.details?.required || [] });
     response.end();
   }
 }
@@ -1447,44 +1367,27 @@ async function handleStreamInsight(request, response, context) {
   const body = await readBody(request);
   const prompt = body.prompt || '';
 
-  response.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-  });
+  initSSEResponse(response);
 
   try {
     const store = loadStore(context.dataDir);
-    const provider = resolveProvider(store, context.env);
-
-    if (!provider.available) {
-      response.write(`event: error\ndata: ${JSON.stringify({ error: 'No AI provider configured' })}\n\n`);
-      response.end();
-      return;
-    }
-
-    response.write(`event: start\ndata: ${JSON.stringify({ id: `insight-${Date.now()}` })}\n\n`);
-
-    // Simulate streaming
-    const tokens = ['Generating', ' insights', '...\n\n', 'Based', ' on', ' your', ' request', ':'];
-    for (const token of tokens) {
-      await new Promise(resolve => setTimeout(resolve, 90));
-      response.write(`event: token\ndata: ${JSON.stringify({ token })}\n\n`);
-    }
-
-    // Send result
-    const result = {
-      insight: 'AI-generated insight based on prompt',
-      confidence: 0.85,
-      sources: [],
-    };
-
-    response.write(`event: result\ndata: ${JSON.stringify(result)}\n\n`);
-    response.write(`event: complete\ndata: ${JSON.stringify({ duration: 720 })}\n\n`);
+    const started = Date.now();
+    sendSSEEvent(response, 'start', { id: `insight-${Date.now()}` });
+    sendSSEEvent(response, 'progress', { progress: 0.2, message: 'Calling configured AI provider' });
+    const result = await runAiText(
+      store,
+      'web.ai.insight.stream',
+      prompt,
+      'You are Lab Link, a precise research lab operations analyst. Use only the provided request and current lab state. Return concise, actionable insight with uncertainty where appropriate.',
+      context.env,
+      body.provider || null,
+    );
+    sendSSEEvent(response, 'result', result);
+    sendSSEEvent(response, 'complete', { duration: Date.now() - started, provider: result.provider });
     response.end();
 
   } catch (error) {
-    response.write(`event: error\ndata: ${JSON.stringify({ error: error.message })}\n\n`);
+    sendSSEEvent(response, 'error', { error: error.message, required: error.details?.required || [] });
     response.end();
   }
 }
