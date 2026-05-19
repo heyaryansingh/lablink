@@ -2,10 +2,10 @@
 
 ## Current Position
 
-- Date: 2026-05-18 America/Chicago
-- Phase: 10 - Web Platform
-- Plan: 10-01
-- Status: Complete
+- Date: 2026-05-19 America/Chicago
+- Phase: 11 - V3 Modular Platform
+- Plan: V3 Foundation
+- Status: In Progress (Foundation Complete)
 - Repository: standalone git repo initialized in `C:\Aryan\GitHub Projects\lablink`
 - Remote: `origin` configured as `https://github.com/heyaryansingh/lablink.git`
 
@@ -23,6 +23,7 @@
 - PRD v2.3 real AI/action layer is active for provider-backed beta work: `docs/product/PRD_V2_3_REAL_AI_ACTIONS.md`.
 - PRD v2.4 web platform is active for the browser workspace, meeting studio, and integration-readiness layer: `docs/product/PRD_V2_4_WEB_PLATFORM.md`.
 - PRD v2.7 modular block workspace is active for the tabbed Lab Blocks Runtime: `docs/product/PRD_V2_7_MODULAR_BLOCK_WORKSPACE.md`.
+- PRD v2.8 collaborative repo guard is active for multi-agent scanning and validation: `docs/product/PRD_V2_8_COLLABORATIVE_REPO_GUARD.md`.
 - PRD v2 remains the prior baseline specification: `docs/product/PRD_V2.md`.
 - PRD v2.1 launch spec is active for the npm-launch layer: `docs/product/PRD_V2_1_LAUNCH_SPEC.md`.
 - Capability gap tracking v2.2 is active: `docs/product/CAPABILITY_GAP_V2_2.md`.
@@ -49,7 +50,16 @@ Current AI/action completion promise:
 
 Current web platform completion promise:
 
-`LABLINK_MODULAR_BLOCK_WORKSPACE_BETA8`
+`LABLINK_COLLABORATIVE_REPO_GUARD_BETA9`
+
+Current V3 foundation completion promises:
+
+`LABLINK_V3_DESIGN_SYSTEM_COMPLETE`
+`LABLINK_V3_ANIMATIONS_COMPLETE`
+`LABLINK_V3_EVENT_BUS_COMPLETE`
+`LABLINK_V3_WEB_COMPONENTS_BASE_COMPLETE`
+`LABLINK_V3_BLOCK_REGISTRY_COMPLETE`
+`LABLINK_V3_STREAMING_UI_COMPLETE`
 
 ## Current Risks
 
@@ -66,9 +76,11 @@ Current web platform completion promise:
 - The browser should avoid permanent tab clutter: one workspace selector, a compact AI organizer, and user-controlled visible/collapsed panels are the current interaction model.
 - The refined v2.6 browser should avoid native-looking primary dropdowns and dashboard walls: command composer, focus canvas, adaptive sections, role presets, inspector sheet, progressive Motion/Floating UI/Sortable enhancement, guided OAuth URL/code-exchange helpers, and real-provider AI organization are the current interaction model.
 - The v2.7 browser restores the modular block design: workspace tabs, draggable lab blocks, per-block subtabs, animated organize loading, AI-controlled block plans, and manual block controls.
+- The v2.8 repo guard adds `lablink repo scan` and npm scripts to detect outside edits, classify risk, and run syntax/web/full validation without destructive git operations.
 
 ## Next Actions
 
 - Start the local web server for browser review.
 - Publish the beta after a final `npm run release:check` in the release environment.
 - Continue full OAuth callbacks, token storage hardening, AI-generated section editing, saved layout presets, richer meeting-to-execution publishing, and deeper lab ontology modeling.
+- Run `npm run repo:scan` after any external Claude/developer change before building on top of it.
